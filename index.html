@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Bolão Copa 2026</title>
-    <!-- Importando a biblioteca oficial do Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -168,7 +167,6 @@
     <h1>🏆 Bolão Copa 2026</h1>
     <p class="subtitle">Agora conectado ao banco de dados na nuvem!</p>
 
-    <!-- TELA DE LOGIN / CADASTRO -->
     <div id="auth-secao" class="auth-container">
         <h3 id="auth-titulo">Entrar no Bolão</h3>
         <div class="auth-form">
@@ -180,37 +178,36 @@
         </div>
     </div>
 
-    <!-- TELA PRINCIPAL DO JOGO (SÓ APARECE LOGADO) -->
     <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <span id="usuario-saudacao" style="font-weight: bold;"></span>
             <button class="btn-logout" onclick="deslogar()">Sair</button>
         </div>
 
-        <!-- RANKING REAL -->
         <div class="ranking-container">
             <h3 class="ranking-titulo">📊 Classificação Geral</h3>
             <div id="tabela-ranking">Carregando classificação...</div>
         </div>
 
-        <!-- PALPITES -->
         <div id="container-jogos"></div>
         <button class="btn-acao" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
     </div>
 
     <script>
-        // CONFIGURAÇÕES DO SUPABASE - CHAVES CORRIGIDAS E LIMPAS
+        // CONFIGURAÇÕES DO SUPABASE
         const SUPABASE_URL = "https://ixnqcwilmvgzkxfmkfaq.supabase.co";
+        // COLE SUA CHAVE LEGACY AQUI DENTRO DAS ASPAS:
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnFjd2lsbXZnemt4Zm1rZmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTQ1NTMsImV4cCI6MjA5NzczMDU1M30.-LqUvPwThvgZw8T5iADZn-I3L-XJvmMFyVqD3rgToq8";
         
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Aqui estava o erro! Mudamos o nome da variável de 'supabase' para 'banco'
+        const banco = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let jogos = [];
         let usuarioAtual = null;
 
         // 1. VERIFICA SE O USUÁRIO JÁ ESTÁ LOGADO AO CARREGAR A PÁGINA
         async function verificarSessao() {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await banco.auth.getSession();
             if (session) {
                 usuarioAtual = session.user;
                 mostrarPainelJogo();
@@ -228,12 +225,12 @@
             if (!email || !password) return alert("Preencha e-mail e senha!");
 
             if (ehLogin) {
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                const { data, error } = await banco.auth.signInWithPassword({ email, password });
                 if (error) return alert("Erro no login: " + error.message);
                 usuarioAtual = data.user;
             } else {
                 if (!nome) return alert("Digite seu nome para criar a conta!");
-                const { data, error } = await supabase.auth.signUp({
+                const { data, error } = await banco.auth.signUp({
                     email, password, options: { data: { nome: nome } }
                 });
                 if (error) return alert("Erro no cadastro: " + error.message);
@@ -244,7 +241,7 @@
         }
 
         async function deslogar() {
-            await supabase.auth.signOut();
+            await banco.auth.signOut();
             usuarioAtual = null;
             mostrarPainelLogin();
         }
@@ -259,7 +256,7 @@
             document.getElementById('jogo-secao').style.display = 'block';
             
             // Busca o nome do usuário salvo no perfil público
-            const { data } = await supabase.from('perfis').select('nome').eq('id', usuarioAtual.id).single();
+            const { data } = await banco.from('perfis').select('nome').eq('id', usuarioAtual.id).single();
             document.getElementById('usuario-saudacao').innerText = `Olá, ${data ? data.nome : 'Jogador'}!`;
 
             await carregarJogosEJogadores();
@@ -272,7 +269,7 @@
                 jogos = await resposta.json();
 
                 // Busca os palpites salvos desse usuário específico no banco de dados
-                const { data: palpitesSalvos, error } = await supabase
+                const { data: palpitesSalvos, error } = await banco
                     .from('palpites')
                     .select('*')
                     .eq('usuario_id', usuarioAtual.id);
@@ -332,7 +329,7 @@
 
             if (listaPalpites.length === 0) return alert("Digite pelo menos um palpite!");
 
-            const { error } = await supabase.from('palpites').upsert(listaPalpites, { onConflict: 'usuario_id,jogo_id' });
+            const { error } = await banco.from('palpites').upsert(listaPalpites, { onConflict: 'usuario_id,jogo_id' });
 
             if (error) {
                 alert("Erro ao salvar palpites: " + error.message);
@@ -344,8 +341,8 @@
 
         // 5. PROCESSA A PONTUAÇÃO DE TODOS OS USUÁRIOS E GERA O RANKING COMPARTILHADO
         async function calcularEAtualizarRankingGeral() {
-            const { data: todosPerfis } = await supabase.from('perfis').select('id, nome');
-            const { data: todosPalpites } = await supabase.from('palpites').select('*');
+            const { data: todosPerfis } = await banco.from('perfis').select('id, nome');
+            const { data: todosPalpites } = await banco.from('palpites').select('*');
 
             if (!todosPerfis) return;
 
