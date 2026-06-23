@@ -1,9 +1,218 @@
-
 [
-  { "id": 1, "grupo": "Grupo A", "data": "11/06/2026", "time1": "México", "time2": "Canadá", "res1": null, "res2": null },
-  { "id": 2, "grupo": "Grupo B", "data": "12/06/2026", "time1": "Estados Unidos", "time2": "Marrocos", "res1": null, "res2": null },
-  { "id": 3, "grupo": "Grupo C", "data": "13/06/2026", "time1": "Brasil", "time2": "Coreia do Sul", "res1": null, "res2": null },
-  { "id": 4, "grupo": "Grupo C", "data": "13/06/2026", "time1": "Suécia", "time2": "Mali", "res1": null, "res2": null },
-  { "id": 5, "grupo": "Grupo D", "data": "14/06/2026", "time1": "Argentina", "time2": "Irlanda", "res1": null, "res2": null },
-  { "id": 6, "grupo": "Grupo E", "data": "14/06/2026", "time1": "França", "time2": "Nigéria", "res1": null, "res2": null }
+  {
+    "id": 1,
+    "grupo": "Grupo B",
+    "data": "24/06 - 16:00",
+    "time1": "Suíça",
+    "time2": "Canadá",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 2,
+    "grupo": "Grupo B",
+    "data": "24/06 - 16:00",
+    "time1": "Bósnia e Herzegovina",
+    "time2": "Catar",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 3,
+    "grupo": "Grupo C",
+    "data": "24/06 - 19:00",
+    "time1": "Marrocos",
+    "time2": "Haiti",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 4,
+    "grupo": "Grupo C",
+    "data": "24/06 - 19:00",
+    "time1": "Escócia",
+    "time2": "Brasil",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 5,
+    "grupo": "Grupo A",
+    "data": "24/06 - 22:00",
+    "time1": "África do Sul",
+    "time2": "Coreia do Sul",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 6,
+    "grupo": "Grupo A",
+    "data": "24/06 - 22:00",
+    "time1": "Tchéquia",
+    "time2": "México",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 7,
+    "grupo": "Grupo E",
+    "data": "25/06 - 17:00",
+    "time1": "Curaçao",
+    "time2": "Costa do Marfim",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 8,
+    "grupo": "Grupo E",
+    "data": "25/06 - 17:00",
+    "time1": "Equador",
+    "time2": "Alemanha",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 9,
+    "grupo": "Grupo F",
+    "data": "25/06 - 20:00",
+    "time1": "Tunísia",
+    "time2": "Países Baixos",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 10,
+    "grupo": "Grupo F",
+    "data": "25/06 - 20:00",
+    "time1": "Japão",
+    "time2": "Suécia",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 11,
+    "grupo": "Grupo D",
+    "data": "25/06 - 23:00",
+    "time1": "Turquia",
+    "time2": "Estados Unidos",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 12,
+    "grupo": "Grupo D",
+    "data": "25/06 - 23:00",
+    "time1": "Paraguai",
+    "time2": "Austrália",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 13,
+    "grupo": "Grupo I",
+    "data": "26/06 - 16:00",
+    "time1": "Noruega",
+    "time2": "França",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 14,
+    "grupo": "Grupo I",
+    "data": "26/06 - 16:00",
+    "time1": "Senegal",
+    "time2": "Iraque",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 15,
+    "grupo": "Grupo H",
+    "data": "26/06 - 21:00",
+    "time1": "Cabo Verde",
+    "time2": "Arábia Saudita",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 16,
+    "grupo": "Grupo H",
+    "data": "26/06 - 21:00",
+    "time1": "Uruguai",
+    "time2": "Espanha",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 17,
+    "grupo": "Grupo G",
+    "data": "27/06 - 00:00",
+    "time1": "Nova Zelândia",
+    "time2": "Bélgica",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 18,
+    "grupo": "Grupo G",
+    "data": "27/06 - 00:00",
+    "time1": "Egito",
+    "time2": "Irã",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 19,
+    "grupo": "Grupo L",
+    "data": "27/06 - 18:00",
+    "time1": "Panamá",
+    "time2": "Inglaterra",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 20,
+    "grupo": "Grupo L",
+    "data": "27/06 - 18:00",
+    "time1": "Croácia",
+    "time2": "Gana",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 21,
+    "grupo": "Grupo K",
+    "data": "27/06 - 20:30",
+    "time1": "Colômbia",
+    "time2": "Portugal",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 22,
+    "grupo": "Grupo K",
+    "data": "27/06 - 20:30",
+    "time1": "RD Congo",
+    "time2": "Uzbequistão",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 23,
+    "grupo": "Grupo J",
+    "data": "27/06 - 23:00",
+    "time1": "Argélia",
+    "time2": "Áustria",
+    "res1": null,
+    "res2": null
+  },
+  {
+    "id": 24,
+    "grupo": "Grupo J",
+    "data": "27/06 - 23:00",
+    "time1": "Jordânia",
+    "time2": "Argentina",
+    "res1": null,
+    "res2": null
+  }
 ]
