@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Bolão Copa 2026</title>
+    <!-- Importando a biblioteca oficial do Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #038C3E;
+            --secondary: #F2B705;
+            --background: #F2F2F2;
+            --card: #FFFFFF;
+            --text: #333333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+        }
+
+        .auth-container, .ranking-container, #container-jogos {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+            box-sizing: border-box;
+        }
+
+        #container-jogos {
+            background: transparent;
+            padding: 0;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        input[type="text"], input[type="email"], input[type="password"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .jogo-card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .info-jogo {
+            font-size: 0.8rem;
+            color: #888;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .placar-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        .time {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1rem;
+        }
+
+        .time.mandante { justify-content: flex-end; }
+        .time.visitante { justify-content: flex-start; }
+
+        input[type="number"] {
+            width: 45px;
+            height: 35px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            margin: 0 10px;
+        }
+
+        .btn-acao {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .btn-logout {
+            background-color: #d93025;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .ranking-titulo {
+            font-size: 1.2rem;
+            color: var(--primary);
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 5px;
+        }
+
+        .ranking-linha {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .ranking-linha.voce {
+            background-color: #e6f4ea;
+            font-weight: bold;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🏆 Bolão Copa 2026</h1>
+    <p class="subtitle">Agora conectado ao banco de dados na nuvem!</p>
+
+    <!-- TELA DE LOGIN / CADASTRO -->
+    <div id="auth-secao" class="auth-container">
+        <h3 id="auth-titulo">Entrar no Bolão</h3>
+        <div class="auth-form">
+            <input type="text" id="auth-nome" placeholder="Seu Nome (Apenas para Cadastro)">
+            <input type="email" id="auth-email" placeholder="Seu E-mail">
+            <input type="password" id="auth-password" placeholder="Sua Senha">
+            <button class="btn-acao" onclick="autenticar(true)">Entrar</button>
+            <button class="btn-acao" style="background-color: #666;" onclick="autenticar(false)">Criar Nova Conta</button>
+        </div>
+    </div>
+
+    <!-- TELA PRINCIPAL DO JOGO (SÓ APARECE LOGADO) -->
+    <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <span id="usuario-saudacao" style="font-weight: bold;"></span>
+            <button class="btn-logout" onclick="deslogar()">Sair</button>
+        </div>
+
+        <!-- RANKING REAL -->
+        <div class="ranking-container">
+            <h3 class="ranking-titulo">📊 Classificação Geral</h3>
+            <div id="tabela-ranking">Carregando classificação...</div>
+        </div>
+
+        <!-- PALPITES -->
+        <div id="container-jogos"></div>
+        <button class="btn-acao" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
+    </div>
+
+    <script>
+        // CONFIGURAÇÕES DO SUPABASE - CHAVES CORRIGIDAS E LIMPAS
+        const SUPABASE_URL = "https://ixnqcwilmvgzkxfmkfaq.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnFjd2lsbXZnemt4Zm1rZmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTQ1NTMsImV4cCI6MjA5NzczMDU1M30.-LqUvPwThvgZw8T5iADZn-I3L-XJvmMFyVqD3rgToq8";
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let jogos = [];
+        let usuarioAtual = null;
+
+        // 1. VERIFICA SE O USUÁRIO JÁ ESTÁ LOGADO AO CARREGAR A PÁGINA
+        async function verificarSessao() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                usuarioAtual = session.user;
+                mostrarPainelJogo();
+            } else {
+                mostrarPainelLogin();
+            }
+        }
+
+        // 2. CADASTRO OU LOGIN
+        async function autenticar(ehLogin) {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const nome = document.getElementById('auth-nome').value;
+
+            if (!email || !password) return alert("Preencha e-mail e senha!");
+
+            if (ehLogin) {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) return alert("Erro no login: " + error.message);
+                usuarioAtual = data.user;
+            } else {
+                if (!nome) return alert("Digite seu nome para criar a conta!");
+                const { data, error } = await supabase.auth.signUp({
+                    email, password, options: { data: { nome: nome } }
+                });
+                if (error) return alert("Erro no cadastro: " + error.message);
+                alert("Conta criada com sucesso! Entre usando seus dados.");
+                return;
+            }
+            mostrarPainelJogo();
+        }
+
+        async function deslogar() {
+            await supabase.auth.signOut();
+            usuarioAtual = null;
+            mostrarPainelLogin();
+        }
+
+        function mostrarPainelLogin() {
+            document.getElementById('auth-secao').style.display = 'block';
+            document.getElementById('jogo-secao').style.display = 'none';
+        }
+
+        async function mostrarPainelJogo() {
+            document.getElementById('auth-secao').style.display = 'none';
+            document.getElementById('jogo-secao').style.display = 'block';
+            
+            // Busca o nome do usuário salvo no perfil público
+            const { data } = await supabase.from('perfis').select('nome').eq('id', usuarioAtual.id).single();
+            document.getElementById('usuario-saudacao').innerText = `Olá, ${data ? data.nome : 'Jogador'}!`;
+
+            await carregarJogosEJogadores();
+        }
+
+        // 3. BUSCA OS JOGOS DO JSON E OS PALPITES DO BANCO DE DADOS
+        async function carregarJogosEJogadores() {
+            try {
+                const resposta = await fetch('jogos.json');
+                jogos = await resposta.json();
+
+                // Busca os palpites salvos desse usuário específico no banco de dados
+                const { data: palpitesSalvos, error } = await supabase
+                    .from('palpites')
+                    .select('*')
+                    .eq('usuario_id', usuarioAtual.id);
+
+                const container = document.getElementById('container-jogos');
+                container.innerHTML = '';
+
+                jogos.forEach(jogo => {
+                    // Encontra se já existe palpite para este jogo específico
+                    const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
+                    const p1Value = palpite ? palpite.palpite_time1 : '';
+                    const p2Value = palpite ? palpite.palpite_time2 : '';
+
+                    let statusJogo = `${jogo.grupo} • ${jogo.data}`;
+                    if (jogo.res1 !== null && jogo.res2 !== null) {
+                        statusJogo += ` | (Resultado Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
+                    }
+
+                    const card = `
+                        <div class="jogo-card">
+                            <div class="info-jogo">${statusJogo}</div>
+                            <div class="placar-container">
+                                <div class="time mandante">${jogo.time1}</div>
+                                <input type="number" id="jogo_${jogo.id}_p1" min="0" value="${p1Value}">
+                                <span>X</span>
+                                <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}">
+                                <div class="time visitante">${jogo.time2}</div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+
+                calcularEAtualizarRankingGeral();
+            } catch (e) {
+                console.error("Erro ao carregar jogos:", e);
+            }
+        }
+
+        // 4. SALVA OS PALPITES DIRETO NA NUVEM (SUPABASE)
+        async function salvarPalpitesNoBanco() {
+            const listaPalpites = [];
+
+            jogos.forEach(jogo => {
+                const p1 = document.getElementById(`jogo_${jogo.id}_p1`).value;
+                const p2 = document.getElementById(`jogo_${jogo.id}_p2`).value;
+
+                if (p1 !== '' && p2 !== '') {
+                    listaPalpites.push({
+                        usuario_id: usuarioAtual.id,
+                        jogo_id: jogo.id,
+                        palpite_time1: parseInt(p1),
+                        palpite_time2: parseInt(p2)
+                    });
+                }
+            });
+
+            if (listaPalpites.length === 0) return alert("Digite pelo menos um palpite!");
+
+            const { error } = await supabase.from('palpites').upsert(listaPalpites, { onConflict: 'usuario_id,jogo_id' });
+
+            if (error) {
+                alert("Erro ao salvar palpites: " + error.message);
+            } else {
+                alert("Seus palpites foram salvos na nuvem com sucesso! ☁️🎉");
+                calcularEAtualizarRankingGeral();
+            }
+        }
+
+        // 5. PROCESSA A PONTUAÇÃO DE TODOS OS USUÁRIOS E GERA O RANKING COMPARTILHADO
+        async function calcularEAtualizarRankingGeral() {
+            const { data: todosPerfis } = await supabase.from('perfis').select('id, nome');
+            const { data: todosPalpites } = await supabase.from('palpites').select('*');
+
+            if (!todosPerfis) return;
+
+            const tabelaRanking = [];
+
+            todosPerfis.forEach(perfil => {
+                let pontosDoUsuario = 0;
+                const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
+
+                jogos.forEach(jogo => {
+                    if (jogo.res1 === null || jogo.res2 === null) return;
+
+                    const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
+                    if (!palpite) return;
+
+                    const p1 = palpite.palpite_time1;
+                    const p2 = palpite.palpite_time2;
+                    const r1 = jogo.res1;
+                    const r2 = jogo.res2;
+
+                    if (p1 === r1 && p2 === r2) {
+                        pontosDoUsuario += 5;
+                    } else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) {
+                        pontosDoUsuario += 3;
+                    }
+                });
+
+                tabelaRanking.push({
+                    nome: perfil.nome,
+                    pontos: pontosDoUsuario,
+                    id: perfil.id
+                });
+            });
+
+            tabelaRanking.sort((a, b) => b.pontos - a.pontos);
+
+            const divRanking = document.getElementById('tabela-ranking');
+            divRanking.innerHTML = '';
+
+            tabelaRanking.forEach((item, index) => {
+                const ehVoce = item.id === usuarioAtual.id ? 'voce' : '';
+                divRanking.innerHTML += `
+                    <div class="ranking-linha ${ehVoce}">
+                        <div><strong>${index + 1}º</strong> ${item.nome}</div>
+                        <div>${item.pontos} pts</div>
+                    </div>
+                `;
+            });
+        }
+
+        verificarSessao();
+    </script>
+</body>
+</html>
