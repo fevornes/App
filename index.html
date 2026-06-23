@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Bolão Copa 2026</title>
+    <!-- Importando a biblioteca oficial do Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -36,7 +37,7 @@
             font-size: 0.9rem;
         }
 
-        .auth-container, .ranking-container, #container-jogos {
+        .auth-container, .ranking-container, #area-jogos-wrapper {
             width: 100%;
             max-width: 500px;
             background: var(--card);
@@ -47,14 +48,55 @@
             box-sizing: border-box;
         }
 
-        #container-jogos {
+        #area-jogos-wrapper {
             background: transparent;
             padding: 0;
             box-shadow: none;
+        }
+
+        #container-jogos {
             display: flex;
             flex-direction: column;
             gap: 15px;
         }
+
+        /* --- NOVOS ESTILOS PARA AS ABAS DE DIAS --- */
+        .tabs-container {
+            display: flex;
+            overflow-x: auto;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 8px;
+            width: 100%;
+        }
+        
+        .tabs-container::-webkit-scrollbar {
+            height: 6px;
+        }
+        
+        .tabs-container::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 10px;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            background-color: var(--card);
+            border: 2px solid #ddd;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #666;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.ativo {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        /* ------------------------------------------ */
 
         .auth-form {
             display: flex;
@@ -167,6 +209,7 @@
     <h1>🏆 Bolão Copa 2026</h1>
     <p class="subtitle">Agora conectado ao banco de dados na nuvem!</p>
 
+    <!-- TELA DE LOGIN / CADASTRO -->
     <div id="auth-secao" class="auth-container">
         <h3 id="auth-titulo">Entrar no Bolão</h3>
         <div class="auth-form">
@@ -178,19 +221,29 @@
         </div>
     </div>
 
+    <!-- TELA PRINCIPAL DO JOGO (SÓ APARECE LOGADO) -->
     <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <span id="usuario-saudacao" style="font-weight: bold;"></span>
             <button class="btn-logout" onclick="deslogar()">Sair</button>
         </div>
 
+        <!-- RANKING REAL -->
         <div class="ranking-container">
             <h3 class="ranking-titulo">📊 Classificação Geral</h3>
             <div id="tabela-ranking">Carregando classificação...</div>
         </div>
 
-        <div id="container-jogos"></div>
-        <button class="btn-acao" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
+        <!-- PALPITES -->
+        <div id="area-jogos-wrapper">
+            <!-- As abas dos dias aparecerão aqui -->
+            <div class="tabs-container" id="dias-tabs"></div>
+            
+            <!-- Os jogos aparecerão aqui -->
+            <div id="container-jogos"></div>
+            
+            <button class="btn-acao" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
+        </div>
     </div>
 
     <script>
@@ -199,13 +252,11 @@
         // COLE SUA CHAVE LEGACY AQUI DENTRO DAS ASPAS:
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnFjd2lsbXZnemt4Zm1rZmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTQ1NTMsImV4cCI6MjA5NzczMDU1M30.-LqUvPwThvgZw8T5iADZn-I3L-XJvmMFyVqD3rgToq8";
         
-        // Aqui estava o erro! Mudamos o nome da variável de 'supabase' para 'banco'
         const banco = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let jogos = [];
         let usuarioAtual = null;
 
-        // 1. VERIFICA SE O USUÁRIO JÁ ESTÁ LOGADO AO CARREGAR A PÁGINA
         async function verificarSessao() {
             const { data: { session } } = await banco.auth.getSession();
             if (session) {
@@ -216,7 +267,6 @@
             }
         }
 
-        // 2. CADASTRO OU LOGIN
         async function autenticar(ehLogin) {
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-password').value;
@@ -255,20 +305,17 @@
             document.getElementById('auth-secao').style.display = 'none';
             document.getElementById('jogo-secao').style.display = 'block';
             
-            // Busca o nome do usuário salvo no perfil público
             const { data } = await banco.from('perfis').select('nome').eq('id', usuarioAtual.id).single();
             document.getElementById('usuario-saudacao').innerText = `Olá, ${data ? data.nome : 'Jogador'}!`;
 
             await carregarJogosEJogadores();
         }
 
-        // 3. BUSCA OS JOGOS DO JSON E OS PALPITES DO BANCO DE DADOS
         async function carregarJogosEJogadores() {
             try {
                 const resposta = await fetch('jogos.json');
                 jogos = await resposta.json();
 
-                // Busca os palpites salvos desse usuário específico no banco de dados
                 const { data: palpitesSalvos, error } = await banco
                     .from('palpites')
                     .select('*')
@@ -277,8 +324,30 @@
                 const container = document.getElementById('container-jogos');
                 container.innerHTML = '';
 
+                // 1. EXTRAIR OS DIAS ÚNICOS PARA CRIAR AS ABAS
+                const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
+                let diaAtivo = diasUnicos.length > 0 ? diasUnicos[0] : ''; // O primeiro dia começa selecionado
+
+                // 2. CRIAR OS BOTÕES DAS ABAS
+                const tabsContainer = document.getElementById('dias-tabs');
+                tabsContainer.innerHTML = '';
+                
+                diasUnicos.forEach(dia => {
+                    const btn = document.createElement('button');
+                    btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
+                    btn.innerText = `Dia ${dia}`;
+                    btn.onclick = () => {
+                        // Atualiza as cores dos botões
+                        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
+                        btn.classList.add('ativo');
+                        // Mostra apenas os jogos desse dia
+                        filtrarJogosNaTela(dia);
+                    };
+                    tabsContainer.appendChild(btn);
+                });
+
+                // 3. CRIAR TODOS OS JOGOS NA TELA (COM CLASSE DE IDENTIFICAÇÃO DO DIA)
                 jogos.forEach(jogo => {
-                    // Encontra se já existe palpite para este jogo específico
                     const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
                     const p1Value = palpite ? palpite.palpite_time1 : '';
                     const p2Value = palpite ? palpite.palpite_time2 : '';
@@ -288,8 +357,10 @@
                         statusJogo += ` | (Resultado Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
                     }
 
+                    const diaDoJogo = jogo.data.split(' - ')[0];
+
                     const card = `
-                        <div class="jogo-card">
+                        <div class="jogo-card jogo-dia" data-dia="${diaDoJogo}">
                             <div class="info-jogo">${statusJogo}</div>
                             <div class="placar-container">
                                 <div class="time mandante">${jogo.time1}</div>
@@ -303,26 +374,40 @@
                     container.innerHTML += card;
                 });
 
+                // Inicia filtrando para mostrar apenas o primeiro dia
+                filtrarJogosNaTela(diaAtivo);
                 calcularEAtualizarRankingGeral();
+                
             } catch (e) {
                 console.error("Erro ao carregar jogos:", e);
             }
         }
 
-        // 4. SALVA OS PALPITES DIRETO NA NUVEM (SUPABASE)
+        // FUNÇÃO QUE ESCONDE/MOSTRA OS JOGOS DE ACORDO COM A ABA
+        function filtrarJogosNaTela(diaDesejado) {
+            document.querySelectorAll('.jogo-dia').forEach(card => {
+                if (card.getAttribute('data-dia') === diaDesejado) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
         async function salvarPalpitesNoBanco() {
             const listaPalpites = [];
 
             jogos.forEach(jogo => {
-                const p1 = document.getElementById(`jogo_${jogo.id}_p1`).value;
-                const p2 = document.getElementById(`jogo_${jogo.id}_p2`).value;
+                const inputP1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                const inputP2 = document.getElementById(`jogo_${jogo.id}_p2`);
 
-                if (p1 !== '' && p2 !== '') {
+                // Verifica se os inputs existem e estão preenchidos antes de salvar
+                if (inputP1 && inputP2 && inputP1.value !== '' && inputP2.value !== '') {
                     listaPalpites.push({
                         usuario_id: usuarioAtual.id,
                         jogo_id: jogo.id,
-                        palpite_time1: parseInt(p1),
-                        palpite_time2: parseInt(p2)
+                        palpite_time1: parseInt(inputP1.value),
+                        palpite_time2: parseInt(inputP2.value)
                     });
                 }
             });
@@ -339,7 +424,6 @@
             }
         }
 
-        // 5. PROCESSA A PONTUAÇÃO DE TODOS OS USUÁRIOS E GERA O RANKING COMPARTILHADO
         async function calcularEAtualizarRankingGeral() {
             const { data: todosPerfis } = await banco.from('perfis').select('id, nome');
             const { data: todosPalpites } = await banco.from('palpites').select('*');
