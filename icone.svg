@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="110" fill="#038C3E"/>
+    
+    <text x="256" y="85" font-family="'Segoe UI', Arial, sans-serif" font-size="65" font-weight="bold" fill="#FFFFFF" text-anchor="middle">BOLÃO</text>
+
+    <path d="M 170 240 C 90 260, 110 400, 160 380" stroke="#FF7E67" stroke-width="35" stroke-linecap="round" fill="none"/>
+    <path d="M 220 240 C 180 350, 180 430, 220 440" stroke="#FF7E67" stroke-width="35" stroke-linecap="round" fill="none"/>
+    <path d="M 292 240 C 332 350, 332 430, 292 440" stroke="#FF7E67" stroke-width="35" stroke-linecap="round" fill="none"/>
+    <path d="M 342 240 C 422 260, 402 400, 352 380" stroke="#FF7E67" stroke-width="35" stroke-linecap="round" fill="none"/>
+
+    <rect x="156" y="110" width="200" height="150" rx="75" fill="#FF7E67"/>
+
+    <circle cx="216" cy="180" r="22" fill="#FFFFFF"/>
+    <circle cx="216" cy="186" r="10" fill="#333333"/>
+    <circle cx="212" cy="182" r="3" fill="#FFFFFF"/> <circle cx="296" cy="180" r="22" fill="#FFFFFF"/>
+    <circle cx="296" cy="186" r="10" fill="#333333"/>
+    <circle cx="292" cy="182" r="3" fill="#FFFFFF"/> <circle cx="176" cy="210" r="12" fill="#FF5E4D" opacity="0.6"/>
+    <circle cx="336" cy="210" r="12" fill="#FF5E4D" opacity="0.6"/>
+
+    <circle cx="256" cy="340" r="70" fill="#FFFFFF"/>
+    <polygon points="256,305 284,325 273,355 239,355 228,325" fill="#333333"/>
+    <path d="M 256 305 L 256 270 M 284 325 L 320 315 M 273 355 L 295 395 M 239 355 L 217 395 M 228 325 L 192 315" stroke="#333333" stroke-width="7" stroke-linecap="round"/>
+
+    <text x="256" y="475" font-family="'Segoe UI', Arial, sans-serif" font-size="50" font-weight="bold" fill="#F2B705" text-anchor="middle">2026</text>
+</svg>
