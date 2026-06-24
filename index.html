@@ -413,7 +413,8 @@
             const { data, error } = await banco.auth.signUp({
                 email, password, options: { data: { nome: nome } }
             });
-            if (error) return alert("Erro no cadastro: " + error.message);
+            // Substitua o alert atual por este (dentro da função fazerCadastro)
+            if (error) return alert("Erro real: " + JSON.stringify(error));
 
             alert("Conta criada com sucesso! Entre agora usando seu e-mail e senha.");
             document.getElementById('login-email').value = email;
