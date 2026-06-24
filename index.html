@@ -5,616 +5,145 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Bolão Copa 2026</title>
     
+    <!-- Configurações para virar Aplicativo (PWA) -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#038C3E">
-    
-    <link class="icon-app" rel="apple-touch-icon" href="icone.svg">
+    <link rel="apple-touch-icon" href="icone.svg">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="icon" type="image/svg+xml" href="icone.svg">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --primary: #038C3E;
-            --secondary: #F2B705;
-            --background: #F2F2F2;
-            --card: #FFFFFF;
-            --text: #333333;
-            
-            --cor-acerto-exato: #28a745;
-            --cor-acerto-vencedor: #6c757d;
-            --cor-erro: #dc3545;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--background);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
+        :root { --primary: #038C3E; --secondary: #F2B705; --background: #F2F2F2; --card: #FFFFFF; --text: #333333; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--background); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         h1 { color: var(--primary); margin-bottom: 5px; }
         .subtitle { color: #666; margin-bottom: 30px; font-size: 0.9rem; }
-
-        .auth-container, .ranking-container, #area-jogos-wrapper {
-            width: 100%;
-            max-width: 500px;
-            background: var(--card);
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 25px;
-            box-sizing: border-box;
-        }
-
-        .auth-titulo { text-align: center; color: var(--primary); margin-top: 5px; margin-bottom: 20px; }
-        #area-jogos-wrapper { background: transparent; padding: 0; box-shadow: none; }
-        #container-jogos { display: flex; flex-direction: column; gap: 15px; }
-
-        .tabs-container {
-            display: flex; overflow-x: auto; gap: 10px; margin-bottom: 20px; padding-bottom: 8px; width: 100%;
-        }
-        .tabs-container::-webkit-scrollbar { height: 6px; }
-        .tabs-container::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
-
-        .tab-btn {
-            padding: 8px 16px; background-color: var(--card); border: 2px solid #ddd;
-            border-radius: 20px; cursor: pointer; font-weight: bold; color: #666;
-            white-space: nowrap; transition: all 0.2s;
-        }
-        .tab-btn.ativo { background-color: var(--primary); color: white; border-color: var(--primary); }
-
-        .auth-form { display: flex; flex-direction: column; gap: 12px; }
-        input[type="text"], input[type="email"], input[type="password"] {
-            padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem;
-            box-sizing: border-box; width: 100%;
-        }
-
-        .jogo-card {
-            background: var(--card); border-radius: 12px; padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
-            border: 3px solid transparent;
-            transition: border-color 0.3s ease;
-        }
-
-        .jogo-card.acerto-exato { border-color: var(--cor-acerto-exato); }
-        .jogo-card.acerto-vencedor { border-color: var(--cor-acerto-vencedor); }
-        .jogo-card.erro-total { border-color: var(--cor-erro); }
-
-        .info-jogo { font-size: 0.8rem; color: #888; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        
-        .placar-container { 
-            display: grid; 
-            grid-template-columns: 1fr 45px auto 45px 1fr; 
-            align-items: center; 
-            gap: 8px; 
-            font-weight: bold; 
-            width: 100%;
-        }
-        
-        .time { 
-            font-size: 0.9rem; 
-            line-height: 1.2; 
-            word-wrap: break-word; 
-            text-align: center;
-            width: 100%;
-        }
-        .time.mandante { justify-self: center; }
-        .time.visitante { justify-self: center; }
-        
-        input[type="number"] {
-            width: 100%; height: 38px; text-align: center; font-size: 1.1rem;
-            font-weight: bold; border: 2px solid #ddd; border-radius: 6px; margin: 0; padding: 0;
-            box-sizing: border-box;
-        }
-        
-        .placar-container span { text-align: center; font-size: 0.9rem; color: #888; }
-
-        .btn-acao {
-            background-color: var(--primary); color: white; border: none; padding: 12px;
-            border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 5px;
-        }
-        .btn-logout { background-color: #d93025; padding: 10px; font-size: 1rem; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; width: 100%; }
-
-        .ranking-titulo { font-size: 1.2rem; color: var(--primary); margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid var(--secondary); padding-bottom: 5px; }
-        .ranking-linha { display: flex; justify-content: space-between; padding: 8px 5px; border-bottom: 1px solid #eee; }
-        .ranking-linha.voce { background-color: #e6f4ea; font-weight: bold; border-radius: 6px; }
-        .link-alternar { text-align: center; font-size: 0.9rem; color: #666; margin-top: 10px; }
-        .link-alternar a { color: var(--primary); font-weight: bold; text-decoration: none; }
-
-        .btn-header-menu { background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text); padding: 0; }
-        .menu-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 998; }
-        
-        .menu-lateral {
-            position: fixed; top: 0; right: -300px; width: 300px; height: 100%; 
-            background: var(--card); box-shadow: -2px 0 10px rgba(0,0,0,0.1); z-index: 999;
-            transition: right 0.3s ease; padding: 20px; box-sizing: border-box; 
-            display: flex; flex-direction: column; gap: 15px; overflow-y: auto;
-        }
+        .auth-container, .ranking-container, #area-jogos-wrapper { width: 100%; max-width: 500px; background: var(--card); border-radius: 12px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 25px; box-sizing: border-box; }
+        .auth-titulo { text-align: center; color: var(--primary); margin: 5px 0 20px 0; }
+        .jogo-card { background: var(--card); border-radius: 12px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px; border: 3px solid transparent; margin-bottom: 15px; }
+        .placar-container { display: grid; grid-template-columns: 1fr 45px auto 45px 1fr; align-items: center; gap: 8px; font-weight: bold; width: 100%; }
+        input[type="number"] { width: 100%; height: 38px; text-align: center; font-weight: bold; border: 2px solid #ddd; border-radius: 6px; }
+        .btn-acao { background-color: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
+        .menu-lateral { position: fixed; top: 0; right: -300px; width: 300px; height: 100%; background: var(--card); z-index: 999; transition: right 0.3s; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
         .menu-lateral.aberto { right: 0; }
-        
-        .btn-fechar-menu { align-self: flex-end; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; margin-bottom: -5px; }
-        .menu-divisor { width: 100%; border: 0; border-top: 1px solid #eee; margin: 2px 0; }
-        
-        .menu-section { display: flex; flex-direction: column; gap: 8px; }
-        .menu-section-title { font-size: 0.95rem; font-weight: bold; color: var(--primary); margin: 0; }
-        
-        .info-box { background: #f8f9fa; padding: 12px; border-radius: 8px; font-size: 0.85rem; color: #444; border: 1px solid #e9ecef; }
-        .info-box p { margin: 6px 0; line-height: 1.3; }
-        .info-box p:first-child { margin-top: 0; }
-        .info-box p:last-child { margin-bottom: 0; }
-        
-        .legenda-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 500; color: #444; }
-        .legenda-item:last-child { margin-bottom: 0; }
-        .cor-box { width: 18px; height: 18px; border-radius: 4px; border: 2px solid; }
-        .cor-box.exato { border-color: var(--cor-acerto-exato); background: #e8f5e9; }
-        .cor-box.vencedor { border-color: var(--cor-acerto-vencedor); background: #f8f9fa; }
-        .cor-box.erro { border-color: var(--cor-erro); background: #fdeaea; }
-
-        /* --- POP-UPS (NOTIFICAÇÃO E TUTORIAL DE INSTALAÇÃO) --- */
-        .popup-notificacao {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
-            padding: 20px; box-sizing: border-box;
-        }
-        .popup-conteudo {
-            background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 400px;
-            text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box;
-            animation: surgirPopup 0.3s ease; position: relative;
-        }
-        @keyframes surgirPopup { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .popup-titulo { color: var(--primary); font-size: 1.4rem; margin-top: 0; margin-bottom: 10px; }
-        .popup-texto { color: #555; font-size: 1rem; margin-bottom: 20px; line-height: 1.4; }
-
-        /* Estilos específicos para as Abas do Tutorial dentro do pop-up */
-        .tutorial-tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-        .t-tab-btn { flex: 1; padding: 8px; border: none; background: #eee; cursor: pointer; border-radius: 6px; font-weight: bold; color: #555; }
-        .t-tab-btn.ativo { background: var(--primary); color: white; }
-        .tutorial-passos { text-align: left; font-size: 0.9rem; color: #444; line-height: 1.5; }
-        .tutorial-passos ol { padding-left: 20px; margin: 10px 0; }
-        .tutorial-passos li { margin-bottom: 8px; }
+        .menu-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 998; }
+        .popup-notificacao { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .popup-conteudo { background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 400px; position: relative; }
+        .tab-btn { padding: 8px 16px; background-color: var(--card); border: 2px solid #ddd; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .tab-btn.ativo { background-color: var(--primary); color: white; border-color: var(--primary); }
     </style>
 </head>
 <body>
 
     <h1>🏆 Bolão Copa 2026</h1>
-    <p class="subtitle">Mostre que você entende de futebol!</p>
-
+    
+    <!-- Login/Cadastro -->
     <div id="login-secao" class="auth-container">
-        <h3 class="auth-titulo">Entrar no Bolão</h3>
-        <div class="auth-form">
-            <input type="email" id="login-email" placeholder="Seu E-mail">
-            <input type="password" id="login-password" placeholder="Sua Senha">
-            <button class="btn-acao" onclick="fazerLogin()">Entrar</button>
-            <div class="link-alternar">Não tem uma conta? <a href="#" onclick="alternarTelas('cadastro')">Cadastre-se aqui</a></div>
-        </div>
+        <h3 class="auth-titulo">Entrar</h3>
+        <input type="email" id="login-email" placeholder="E-mail" style="width:100%; padding:10px; margin-bottom:10px; border-radius:6px; border:1px solid #ccc;">
+        <input type="password" id="login-password" placeholder="Senha" style="width:100%; padding:10px; margin-bottom:10px; border-radius:6px; border:1px solid #ccc;">
+        <button class="btn-acao" onclick="fazerLogin()">Entrar</button>
     </div>
 
-    <div id="cadastro-secao" class="auth-container" style="display: none;">
-        <h3 class="auth-titulo">Criar Nova Conta</h3>
-        <div class="auth-form">
-            <input type="text" id="cadastro-nome" placeholder="Seu Nome e Sobrenome">
-            <input type="email" id="cadastro-email" placeholder="Seu E-mail">
-            <input type="password" id="cadastro-password" placeholder="Crie uma Senha">
-            <button class="btn-acao" style="background-color: var(--secondary); color: var(--text);" onclick="fazerCadastro()">Confirmar Cadastro</button>
-            <div class="link-alternar">Já tem conta? <a href="#" onclick="alternarTelas('login')">Faça login</a></div>
-        </div>
-    </div>
-
+    <!-- Jogo -->
     <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
-            <span id="usuario-saudacao" style="font-weight: bold; font-size: 1.1rem;"></span>
-            <button class="btn-header-menu" onclick="abrirMenu()">☰</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <span id="usuario-saudacao" style="font-weight: bold;"></span>
+            <button onclick="abrirMenu()" style="background:none; border:none; font-size:1.5rem;">☰</button>
         </div>
-
-        <div class="ranking-container">
-            <h3 class="ranking-titulo">📊 Classificação Geral</h3>
-            <div id="tabela-ranking">Carregando classificação...</div>
-        </div>
-
-        <div id="area-jogos-wrapper">
-            <div class="tabs-container" id="dias-tabs"></div>
-            <div id="container-jogos"></div>
-            <button class="btn-acao" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
-        </div>
+        <div id="container-jogos"></div>
+        <button class="btn-acao" onclick="salvarPalpites()">Salvar Palpites</button>
     </div>
 
+    <!-- Menu Lateral -->
     <div class="menu-overlay" id="menu-overlay" onclick="fecharMenu()"></div>
     <div class="menu-lateral" id="menu-lateral">
-        <button class="btn-fechar-menu" onclick="fecharMenu()">✖</button>
-        
-        <h3 style="margin-top: -10px; margin-bottom: 5px; color: var(--primary); font-size: 1.3rem;">⚙️ Menu</h3>
-        
-        <button class="btn-acao" style="background-color: var(--secondary); color: var(--text); padding: 10px; font-size: 0.95rem; margin-top: 0; margin-bottom: 5px;" onclick="abrirTutorialInstalacao()">📱 Instalar Aplicativo</button>
-
-        <hr class="menu-divisor">
-        
-        <div class="menu-section">
-            <p class="menu-section-title">👤 Alterar Perfil</p>
-            <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
-            <button class="btn-acao" style="padding: 10px; font-size: 0.9rem; margin-top: 0;" onclick="salvarNovoNome()">Atualizar Nome</button>
-        </div>
-
-        <hr class="menu-divisor">
-
-        <div class="menu-section">
-            <p class="menu-section-title">📏 Regra de Pontuação</p>
-            <div class="info-box">
-                <p><strong>5 Pontos:</strong> Acertou na mosca o placar exato da partida.</p>
-                <p><strong>3 Pontos:</strong> Acertou quem venceu ou o empate, mas errou o placar.</p>
-                <p><strong>0 Pontos:</strong> Errou o resultado final.</p>
-            </div>
-        </div>
-
-        <hr class="menu-divisor">
-
-        <div class="menu-section">
-            <p class="menu-section-title">🎨 Legenda de Cores</p>
-            <div class="info-box">
-                <div class="legenda-item"><span class="cor-box exato"></span> Acerto Exato (5 pts)</div>
-                <div class="legenda-item"><span class="cor-box vencedor"></span> Acerto Vencedor (3 pts)</div>
-                <div class="legenda-item"><span class="cor-box erro"></span> Erro (0 pts)</div>
-            </div>
-        </div>
-
-        <hr class="menu-divisor">
-
-        <button class="btn-logout" style="margin-top: 5px;" onclick="deslogar()">Sair do Aplicativo</button>
+        <button onclick="fecharMenu()" style="align-self:flex-end; border:none; background:none;">✖</button>
+        <h3>⚙️ Menu</h3>
+        <button class="btn-acao" style="background:var(--secondary); color:#000;" onclick="abrirTutorialInstalacao()">📱 Instalar App</button>
+        <button class="btn-acao" style="background:#333;" onclick="abrirAdmin()">⚙️ Painel Admin</button>
+        <button class="btn-acao" style="background:#d93025;" onclick="deslogar()">Sair</button>
     </div>
 
-    <div class="popup-notificacao" id="popup-aviso">
+    <!-- Popups -->
+    <div class="popup-notificacao" id="popup-admin" style="display: none;">
         <div class="popup-conteudo">
-            <h3 class="popup-titulo">⚽ Ranking Updated!</h3>
-            <p class="popup-texto" id="popup-texto-data">Novos resultados oficiais foram adicionados pela banca do bolão. Venha conferir como ficou a classificação geral!</p>
-            <button class="btn-acao" onclick="fecharPopupAviso()">Ver Classificação</button>
-        </div>
-    </div>
-
-    <div class="popup-notificacao" id="popup-tutorial">
-        <div class="popup-conteudo">
-            <button onclick="fecharTutorialInstalacao()" style="position: absolute; top: 12px; right: 15px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #888;">✖</button>
-            <h3 class="popup-titulo" style="margin-bottom: 15px; font-size: 1.2rem;">Como Instalar no Celular</h3>
-            
-            <div class="tutorial-tabs">
-                <button class="t-tab-btn ativo" id="btn-tab-android" onclick="mudarAbaTutorial('android')">🤖 Android</button>
-                <button class="t-tab-btn" id="btn-tab-ios" onclick="mudarAbaTutorial('ios')">🍏 iPhone (iOS)</button>
-            </div>
-
-            <div id="passos-android" class="tutorial-passos">
-                <p>Se você usa o navegador <strong>Google Chrome</strong>:</p>
-                <ol>
-                    <li>Toque nos <strong>três pontinhos ( ⁝ )</strong> no canto superior direito da tela.</li>
-                    <li>Clique na opção <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
-                    <li>Pronto! O Polvo Paul vai aparecer junto com as suas redes sociais.</li>
-                </ol>
-            </div>
-
-            <div id="passos-ios" class="tutorial-passos" style="display: none;">
-                <p>Você precisa abrir o site pelo navegador padrão <strong>Safari</strong>:</p>
-                <ol>
-                    <li>Toque no botão de <strong>Compartilhar</strong> (o ícone de um quadrado com uma seta para cima na barra de baixo).</li>
-                    <li>Role as opções para baixo e clique em <strong>"Adicionar à Tela de Início"</strong>.</li>
-                    <li>Clique em <strong>Adicionar</strong> no canto superior direito e o ícone estará fixado no seu celular!</li>
-                </ol>
-            </div>
-            
-            <button class="btn-acao" style="margin-top: 15px; padding: 10px;" onclick="fecharTutorialInstalacao()">Entendi</button>
+            <h3>⚙️ Painel de Adm</h3>
+            <div id="lista-jogos-admin" style="max-height: 300px; overflow-y: auto;"></div>
+            <button class="btn-acao" onclick="fecharAdmin()">Fechar</button>
         </div>
     </div>
 
     <script>
         const SUPABASE_URL = "https://ixnqcwilmvgzkxfmkfaq.supabase.co";
-        // COLE SUA CHAVE LEGACY AQUI DENTRO DAS ASPAS:
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnFjd2lsbXZnemt4Zm1rZmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTQ1NTMsImV4cCI6MjA5NzczMDU1M30.-LqUvPwThvgZw8T5iADZn-I3L-XJvmMFyVqD3rgToq8";
-        
+        const SUPABASE_ANON_KEY = "SUA_CHAVE_AQUI"; // <-- COLE SUA CHAVE AQUI
+        const MEU_EMAIL_ADM = "SEU_EMAIL_AQUI"; // <-- COLE SEU EMAIL AQUI
+
         const banco = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        let jogos = [];
         let usuarioAtual = null;
+        let jogos = [];
 
-        // --- FUNÇÕES DO NOVO POP-UP DE TUTORIAL ---
-        function abrirTutorialInstalacao() {
-            fecharMenu(); // Fecha o menu lateral
-            document.getElementById('popup-tutorial').style.display = 'flex';
-        }
+        // Inicialização
+        banco.auth.onAuthStateChange((event, session) => {
+            if (session) { usuarioAtual = session.user; mostrarPainelJogo(); }
+            else { mostrarPainelLogin(); }
+        });
 
-        function fecharTutorialInstalacao() {
-            document.getElementById('popup-tutorial').style.display = 'none';
-        }
-
-        function mudarAbaTutorial(sistema) {
-            if(sistema === 'android') {
-                document.getElementById('btn-tab-android').classList.add('ativo');
-                document.getElementById('btn-tab-ios').classList.remove('ativo');
-                document.getElementById('passos-android').style.display = 'block';
-                document.getElementById('passos-ios').style.display = 'none';
-            } else {
-                document.getElementById('btn-tab-ios').classList.add('ativo');
-                document.getElementById('btn-tab-android').classList.remove('ativo');
-                document.getElementById('passos-ios').style.display = 'block';
-                document.getElementById('passos-android').style.display = 'none';
-            }
-        }
-        // ------------------------------------------
-
-        function abrirMenu() {
-            document.getElementById('menu-overlay').style.display = 'block';
-            setTimeout(() => { document.getElementById('menu-lateral').classList.add('aberto'); }, 10);
-        }
-
-        function fecharMenu() {
-            document.getElementById('menu-lateral').classList.remove('aberto');
-            setTimeout(() => { document.getElementById('menu-overlay').style.display = 'none'; }, 300);
-        }
-
-        function fecharPopupAviso() {
-            document.getElementById('popup-aviso').style.display = 'none';
-        }
-
-        async function salvarNovoNome() {
-            const novoNome = document.getElementById('input-mudar-nome').value.trim();
-            if (!novoNome) return alert("Digite um nome válido!");
-
-            const { error: erroPerfil } = await banco.from('perfis').update({ nome: novoNome }).eq('id', usuarioAtual.id);
-            if (erroPerfil) return alert("Erro ao atualizar nome: " + erroPerfil.message);
-
-            await banco.auth.updateUser({ data: { nome: novoNome } });
-
-            alert("Nome atualizado com sucesso!");
-            document.getElementById('usuario-saudacao').innerText = `Olá, ${novoNome}!`;
-            document.getElementById('input-mudar-nome').value = '';
-            fecharMenu();
-            calcularEAtualizarRankingGeral();
-        }
-
-        function alternarTelas(telaDesejada) {
-            if (telaDesejada === 'cadastro') {
-                document.getElementById('login-secao').style.display = 'none';
-                document.getElementById('cadastro-secao').style.display = 'block';
-            } else {
-                document.getElementById('cadastro-secao').style.display = 'none';
-                document.getElementById('login-secao').style.display = 'block';
-            }
-        }
-
-        async function verificarSessao() {
-            const { data: { session } } = await banco.auth.getSession();
-            if (session) {
-                usuarioAtual = session.user;
-                mostrarPainelJogo();
-            } else {
-                mostrarPainelLogin();
-            }
-        }
-
-        async function fazerLogin() {
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            if (!email || !password) return alert("Preencha e-mail e senha!");
-
-            const { data, error } = await banco.auth.signInWithPassword({ email, password });
-            if (error) return alert("Erro no login. Verifique seu e-mail e senha.");
-            
-            usuarioAtual = data.user;
-            mostrarPainelJogo();
-        }
-
-        async function fazerCadastro() {
-            const nome = document.getElementById('cadastro-nome').value;
-            const email = document.getElementById('cadastro-email').value;
-            const password = document.getElementById('cadastro-password').value;
-            if (!nome || !email || !password) return alert("Preencha todos os campos!");
-
-            const { data, error } = await banco.auth.signUp({
-                email, password, options: { data: { nome: nome } }
-            });
-            // Substitua o alert atual por este (dentro da função fazerCadastro)
-            if (error) return alert("Erro real: " + JSON.stringify(error));
-
-            alert("Conta criada com sucesso! Entre agora usando seu e-mail e senha.");
-            document.getElementById('login-email').value = email;
-            document.getElementById('login-password').value = '';
-            document.getElementById('cadastro-nome').value = '';
-            document.getElementById('cadastro-email').value = '';
-            document.getElementById('cadastro-password').value = '';
-            alternarTelas('login');
-        }
-
-        async function deslogar() {
-            fecharMenu();
-            await banco.auth.signOut();
-            usuarioAtual = null;
-            document.getElementById('login-password').value = '';
-            mostrarPainelLogin();
-        }
-
-        function mostrarPainelLogin() {
-            document.getElementById('cadastro-secao').style.display = 'none';
-            document.getElementById('jogo-secao').style.display = 'none';
-            document.getElementById('login-secao').style.display = 'block';
-        }
-
+        function mostrarPainelLogin() { document.getElementById('login-secao').style.display = 'block'; document.getElementById('jogo-secao').style.display = 'none'; }
+        
         async function mostrarPainelJogo() {
             document.getElementById('login-secao').style.display = 'none';
-            document.getElementById('cadastro-secao').style.display = 'none';
             document.getElementById('jogo-secao').style.display = 'block';
-            
-            const { data } = await banco.from('perfis').select('nome').eq('id', usuarioAtual.id).single();
-            document.getElementById('usuario-saudacao').innerText = `Olá, ${data ? data.nome : 'Jogador'}!`;
-
             await carregarJogosEJogadores();
         }
 
         async function carregarJogosEJogadores() {
-    try {
-        // Buscando os jogos direto do Supabase (tabela 'jogos')
-        const { data: jogosDoBanco, error: erroJogos } = await banco
-            .from('jogos')
-            .select('*')
-            .order('id', { ascending: true });
-
-        if (erroJogos) throw erroJogos;
-        
-        jogos = jogosDoBanco;
-
-        // --- SISTEMA DE NOTIFICAÇÃO (MANTIDO) ---
-        // Como agora é banco, podemos remover a lógica de data do JSON e focar no estado do jogo
-        // ----------------------------------------
-
-        const { data: palpitesSalvos } = await banco
-            .from('palpites')
-            .select('*')
-            .eq('usuario_id', usuarioAtual.id);
-
-        const container = document.getElementById('container-jogos');
-        container.innerHTML = '';
-
-        const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
-        let diaAtivo = diasUnicos.length > 0 ? diasUnicos[0] : '';
-
-        const tabsContainer = document.getElementById('dias-tabs');
-        tabsContainer.innerHTML = '';
-        
-        diasUnicos.forEach(dia => {
-            const btn = document.createElement('button');
-            btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
-            btn.innerText = `Dia ${dia}`;
-            btn.onclick = () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
-                btn.classList.add('ativo');
-                filtrarJogosNaTela(dia);
-            };
-            tabsContainer.appendChild(btn);
-        });
-
-        jogos.forEach(jogo => {
-            const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
-            const p1Value = palpite ? palpite.palpite_time1 : '';
-            const p2Value = palpite ? palpite.palpite_time2 : '';
-
-            let statusJogo = `${jogo.grupo} • ${jogo.data}`;
-            let classeResultado = '';
-
-            // Lógica de cores baseada no banco
-            if (jogo.res1 !== null && jogo.res2 !== null) {
-                statusJogo += ` | (Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
-                
-                if (palpite !== undefined && palpite !== null && p1Value !== '' && p2Value !== '') {
-                    const p1 = parseInt(p1Value), p2 = parseInt(p2Value);
-                    const r1 = jogo.res1, r2 = jogo.res2;
-
-                    if (p1 === r1 && p2 === r2) { classeResultado = 'acerto-exato'; } 
-                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { classeResultado = 'acerto-vencedor'; } 
-                    else { classeResultado = 'erro-total'; }
-                } else { classeResultado = 'erro-total'; }
-            }
-
-            const diaDoJogo = jogo.data.split(' - ')[0];
-
-            const card = `
-                <div class="jogo-card jogo-dia ${classeResultado}" data-dia="${diaDoJogo}">
-                    <div class="info-jogo">${statusJogo}</div>
-                    <div class="placar-container">
-                        <div class="time mandante">${jogo.time1}</div>
-                        <input type="number" id="jogo_${jogo.id}_p1" min="0" value="${p1Value}">
-                        <span>X</span>
-                        <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}">
-                        <div class="time visitante">${jogo.time2}</div>
-                    </div>
-                </div>
-            `;
-            container.innerHTML += card;
-        });
-
-        filtrarJogosNaTela(diaAtivo);
-        calcularEAtualizarRankingGeral();
-        
-    } catch (e) { console.error("Erro ao carregar do banco:", e); }
-}
-
-        function filtrarJogosNaTela(diaDesejado) {
-            document.querySelectorAll('.jogo-dia').forEach(card => {
-                card.style.display = (card.getAttribute('data-dia') === diaDesejado) ? 'flex' : 'none';
-            });
-        }
-
-        async function salvarPalpitesNoBanco() {
-            const listaPalpites = [];
-
+            const { data: jogosDoBanco } = await banco.from('jogos').select('*').order('id', { ascending: true });
+            jogos = jogosDoBanco || [];
+            const container = document.getElementById('container-jogos');
+            container.innerHTML = '';
             jogos.forEach(jogo => {
-                const inputP1 = document.getElementById(`jogo_${jogo.id}_p1`);
-                const inputP2 = document.getElementById(`jogo_${jogo.id}_p2`);
-
-                if (inputP1 && inputP2 && inputP1.value !== '' && inputP2.value !== '') {
-                    listaPalpites.push({
-                        usuario_id: usuarioAtual.id, jogo_id: jogo.id,
-                        palpite_time1: parseInt(inputP1.value), palpite_time2: parseInt(inputP2.value)
-                    });
-                }
-            });
-
-            if (listaPalpites.length === 0) return alert("Digite pelo menos um palpite!");
-
-            const { error } = await banco.from('palpites').upsert(listaPalpites, { onConflict: 'usuario_id,jogo_id' });
-
-            if (error) {
-                alert("Erro ao salvar palpites: " + error.message);
-            } else {
-                alert("Seus palpites foram salvos na nuvem com sucesso! ☁️🎉");
-                calcularEAtualizarRankingGeral();
-                await carregarJogosEJogadores();
-            }
-        }
-
-        async function calcularEAtualizarRankingGeral() {
-            const { data: todosPerfis } = await banco.from('perfis').select('id, nome');
-            const { data: todosPalpites } = await banco.from('palpites').select('*');
-
-            if (!todosPerfis) return;
-
-            const tabelaRanking = [];
-
-            todosPerfis.forEach(perfil => {
-                let pontosDoUsuario = 0;
-                const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
-
-                jogos.forEach(jogo => {
-                    if (jogo.res1 === null || jogo.res2 === null) return;
-                    const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
-                    if (!palpite) return;
-
-                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                    const r1 = jogo.res1, r2 = jogo.res2;
-
-                    if (p1 === r1 && p2 === r2) { pontosDoUsuario += 5; } 
-                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { pontosDoUsuario += 3; }
-                });
-
-                tabelaRanking.push({ nome: perfil.nome, pontos: pontosDoUsuario, id: perfil.id });
-            });
-
-            tabelaRanking.sort((a, b) => b.pontos - a.pontos);
-
-            const divRanking = document.getElementById('tabela-ranking');
-            divRanking.innerHTML = '';
-
-            tabelaRanking.forEach((item, index) => {
-                const ehVoce = item.id === usuarioAtual.id ? 'voce' : '';
-                divRanking.innerHTML += `
-                    <div class="ranking-linha ${ehVoce}">
-                        <div><strong>${index + 1}º</strong> ${item.nome}</div>
-                        <div>${item.pontos} pts</div>
-                    </div>
-                `;
+                container.innerHTML += `
+                    <div class="jogo-card">
+                        <small>${jogo.grupo} • ${jogo.data}</small>
+                        <div class="placar-container">
+                            <div>${jogo.time1}</div>
+                            <input type="number" id="jogo_${jogo.id}_p1" value="">
+                            <span>X</span>
+                            <input type="number" id="jogo_${jogo.id}_p2" value="">
+                            <div>${jogo.time2}</div>
+                        </div>
+                    </div>`;
             });
         }
 
-        verificarSessao();
+        async function abrirAdmin() {
+            if (usuarioAtual.email !== MEU_EMAIL_ADM) return alert("Acesso negado!");
+            document.getElementById('popup-admin').style.display = 'flex';
+            const cont = document.getElementById('lista-jogos-admin');
+            cont.innerHTML = '';
+            jogos.forEach(j => {
+                cont.innerHTML += `<div>${j.time1} x ${j.time2} 
+                    <input type="number" id="adm_r1_${j.id}" value="${j.res1 || 0}"> 
+                    <input type="number" id="adm_r2_${j.id}" value="${j.res2 || 0}"> 
+                    <button onclick="salvarResultadoAdmin(${j.id})">Salvar</button></div>`;
+            });
+        }
+
+        async function salvarResultadoAdmin(id) {
+            const r1 = document.getElementById('adm_r1_'+id).value;
+            const r2 = document.getElementById('adm_r2_'+id).value;
+            await banco.from('jogos').update({ res1: parseInt(r1), res2: parseInt(r2) }).eq('id', id);
+            alert("Salvo!"); fecharAdmin(); carregarJogosEJogadores();
+        }
+
+        // Funções de apoio
+        function abrirMenu() { document.getElementById('menu-lateral').classList.add('aberto'); document.getElementById('menu-overlay').style.display = 'block'; }
+        function fecharMenu() { document.getElementById('menu-lateral').classList.remove('aberto'); document.getElementById('menu-overlay').style.display = 'none'; }
+        function fecharAdmin() { document.getElementById('popup-admin').style.display = 'none'; }
+        async function fazerLogin() { await banco.auth.signInWithPassword({ email: document.getElementById('login-email').value, password: document.getElementById('login-password').value }); }
+        async function deslogar() { await banco.auth.signOut(); }
     </script>
 </body>
 </html>
