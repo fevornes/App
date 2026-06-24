@@ -26,16 +26,8 @@
             align-items: center;
         }
 
-        h1 {
-            color: var(--primary);
-            margin-bottom: 5px;
-        }
-
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 0.9rem;
-        }
+        h1 { color: var(--primary); margin-bottom: 5px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 0.9rem; }
 
         .auth-container, .ranking-container, #area-jogos-wrapper {
             width: 100%;
@@ -48,170 +40,71 @@
             box-sizing: border-box;
         }
 
-        .auth-titulo {
-            text-align: center;
-            color: var(--primary);
-            margin-top: 5px;
-            margin-bottom: 20px;
-        }
-
-        #area-jogos-wrapper {
-            background: transparent;
-            padding: 0;
-            box-shadow: none;
-        }
-
-        #container-jogos {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
+        .auth-titulo { text-align: center; color: var(--primary); margin-top: 5px; margin-bottom: 20px; }
+        #area-jogos-wrapper { background: transparent; padding: 0; box-shadow: none; }
+        #container-jogos { display: flex; flex-direction: column; gap: 15px; }
 
         .tabs-container {
-            display: flex;
-            overflow-x: auto;
-            gap: 10px;
-            margin-bottom: 20px;
-            padding-bottom: 8px;
-            width: 100%;
+            display: flex; overflow-x: auto; gap: 10px; margin-bottom: 20px; padding-bottom: 8px; width: 100%;
         }
-        
         .tabs-container::-webkit-scrollbar { height: 6px; }
         .tabs-container::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
 
         .tab-btn {
-            padding: 8px 16px;
-            background-color: var(--card);
-            border: 2px solid #ddd;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
-            color: #666;
-            white-space: nowrap;
-            transition: all 0.2s;
+            padding: 8px 16px; background-color: var(--card); border: 2px solid #ddd;
+            border-radius: 20px; cursor: pointer; font-weight: bold; color: #666;
+            white-space: nowrap; transition: all 0.2s;
         }
+        .tab-btn.ativo { background-color: var(--primary); color: white; border-color: var(--primary); }
 
-        .tab-btn.ativo {
-            background-color: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-
-        .auth-form {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
+        .auth-form { display: flex; flex-direction: column; gap: 12px; }
         input[type="text"], input[type="email"], input[type="password"] {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 1rem;
+            padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem;
         }
 
         .jogo-card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            background: var(--card); border-radius: 12px; padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
         }
-
-        .info-jogo {
-            font-size: 0.8rem;
-            color: #888;
-            text-align: center;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-
-        .placar-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: bold;
-        }
-
-        .time {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 1rem;
-        }
-
+        .info-jogo { font-size: 0.8rem; color: #888; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .placar-container { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        .time { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 1rem; }
         .time.mandante { justify-content: flex-end; }
         .time.visitante { justify-content: flex-start; }
-
         input[type="number"] {
-            width: 45px;
-            height: 35px;
-            text-align: center;
-            font-size: 1.2rem;
-            font-weight: bold;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            margin: 0 10px;
+            width: 45px; height: 35px; text-align: center; font-size: 1.2rem;
+            font-weight: bold; border: 2px solid #ddd; border-radius: 6px; margin: 0 10px;
         }
 
         .btn-acao {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 5px;
+            background-color: var(--primary); color: white; border: none; padding: 12px;
+            border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 5px;
         }
+        .btn-logout { background-color: #d93025; padding: 10px; font-size: 1rem; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; width: 100%; }
 
-        .btn-logout {
-            background-color: #d93025;
-            padding: 5px 10px;
-            font-size: 0.8rem;
-            border-radius: 4px;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
+        .ranking-titulo { font-size: 1.2rem; color: var(--primary); margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid var(--secondary); padding-bottom: 5px; }
+        .ranking-linha { display: flex; justify-content: space-between; padding: 8px 5px; border-bottom: 1px solid #eee; }
+        .ranking-linha.voce { background-color: #e6f4ea; font-weight: bold; border-radius: 6px; }
+        .link-alternar { text-align: center; font-size: 0.9rem; color: #666; margin-top: 10px; }
+        .link-alternar a { color: var(--primary); font-weight: bold; text-decoration: none; }
 
-        .ranking-titulo {
-            font-size: 1.2rem;
-            color: var(--primary);
-            margin-top: 0;
-            margin-bottom: 15px;
-            border-bottom: 2px solid var(--secondary);
-            padding-bottom: 5px;
+        /* --- ESTILOS DO MENU LATERAL --- */
+        .btn-header-menu {
+            background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text); padding: 0;
         }
-
-        .ranking-linha {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 5px;
-            border-bottom: 1px solid #eee;
+        .menu-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 998;
         }
-
-        .ranking-linha.voce {
-            background-color: #e6f4ea;
-            font-weight: bold;
-            border-radius: 6px;
+        .menu-lateral {
+            position: fixed; top: 0; right: -280px; width: 280px; height: 100%;
+            background: var(--card); box-shadow: -2px 0 10px rgba(0,0,0,0.1); z-index: 999;
+            transition: right 0.3s ease; padding: 25px 20px; box-sizing: border-box;
+            display: flex; flex-direction: column; gap: 15px;
         }
-
-        .link-alternar {
-            text-align: center;
-            font-size: 0.9rem;
-            color: #666;
-            margin-top: 10px;
-        }
-        .link-alternar a {
-            color: var(--primary);
-            font-weight: bold;
-            text-decoration: none;
+        .menu-lateral.aberto { right: 0; }
+        .btn-fechar-menu {
+            align-self: flex-end; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; margin-bottom: 10px;
         }
     </style>
 </head>
@@ -220,20 +113,18 @@
     <h1>🏆 Bolão Copa 2026</h1>
     <p class="subtitle">Mostre que você entende de futebol!</p>
 
-    <!-- TELA DE LOGIN (Padrao) -->
+    <!-- TELA DE LOGIN -->
     <div id="login-secao" class="auth-container">
         <h3 class="auth-titulo">Entrar no Bolão</h3>
         <div class="auth-form">
             <input type="email" id="login-email" placeholder="Seu E-mail">
             <input type="password" id="login-password" placeholder="Sua Senha">
             <button class="btn-acao" onclick="fazerLogin()">Entrar</button>
-            <div class="link-alternar">
-                Não tem uma conta? <a href="#" onclick="alternarTelas('cadastro')">Cadastre-se aqui</a>
-            </div>
+            <div class="link-alternar">Não tem uma conta? <a href="#" onclick="alternarTelas('cadastro')">Cadastre-se aqui</a></div>
         </div>
     </div>
 
-    <!-- TELA DE CADASTRO (Escondida por padrao) -->
+    <!-- TELA DE CADASTRO -->
     <div id="cadastro-secao" class="auth-container" style="display: none;">
         <h3 class="auth-titulo">Criar Nova Conta</h3>
         <div class="auth-form">
@@ -241,17 +132,17 @@
             <input type="email" id="cadastro-email" placeholder="Seu E-mail">
             <input type="password" id="cadastro-password" placeholder="Crie uma Senha">
             <button class="btn-acao" style="background-color: var(--secondary); color: var(--text);" onclick="fazerCadastro()">Confirmar Cadastro</button>
-            <div class="link-alternar">
-                Já tem conta? <a href="#" onclick="alternarTelas('login')">Faça login</a>
-            </div>
+            <div class="link-alternar">Já tem conta? <a href="#" onclick="alternarTelas('login')">Faça login</a></div>
         </div>
     </div>
 
-    <!-- TELA PRINCIPAL DO JOGO (SÓ APARECE LOGADO) -->
+    <!-- TELA PRINCIPAL DO JOGO -->
     <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <span id="usuario-saudacao" style="font-weight: bold;"></span>
-            <button class="btn-logout" onclick="deslogar()">Sair</button>
+        
+        <!-- CABEÇALHO COM O BOTÃO DE MENU ☰ -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
+            <span id="usuario-saudacao" style="font-weight: bold; font-size: 1.1rem;"></span>
+            <button class="btn-header-menu" onclick="abrirMenu()">☰</button>
         </div>
 
         <div class="ranking-container">
@@ -266,8 +157,23 @@
         </div>
     </div>
 
+    <!-- ESTRUTURA DO MENU LATERAL -->
+    <div class="menu-overlay" id="menu-overlay" onclick="fecharMenu()"></div>
+    <div class="menu-lateral" id="menu-lateral">
+        <button class="btn-fechar-menu" onclick="fecharMenu()">✖</button>
+        
+        <h3 style="margin-top: 0; color: var(--primary);">⚙️ Configurações</h3>
+        
+        <label style="font-size: 0.9rem; font-weight: bold; color: #555;">Alterar Nome de Exibição:</label>
+        <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
+        <button class="btn-acao" style="padding: 10px; font-size: 0.9rem;" onclick="salvarNovoNome()">Atualizar Nome</button>
+        
+        <hr style="width: 100%; border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        
+        <button class="btn-logout" onclick="deslogar()">Sair do Aplicativo</button>
+    </div>
+
     <script>
-        // CONFIGURAÇÕES DO SUPABASE
         const SUPABASE_URL = "https://ixnqcwilmvgzkxfmkfaq.supabase.co";
         // COLE SUA CHAVE LEGACY AQUI DENTRO DAS ASPAS:
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnFjd2lsbXZnemt4Zm1rZmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTQ1NTMsImV4cCI6MjA5NzczMDU1M30.-LqUvPwThvgZw8T5iADZn-I3L-XJvmMFyVqD3rgToq8";
@@ -277,7 +183,37 @@
         let jogos = [];
         let usuarioAtual = null;
 
-        // Funcao para trocar entre Login e Cadastro
+        // --- FUNÇÕES DO MENU LATERAL ---
+        function abrirMenu() {
+            document.getElementById('menu-overlay').style.display = 'block';
+            setTimeout(() => { document.getElementById('menu-lateral').classList.add('aberto'); }, 10);
+        }
+
+        function fecharMenu() {
+            document.getElementById('menu-lateral').classList.remove('aberto');
+            setTimeout(() => { document.getElementById('menu-overlay').style.display = 'none'; }, 300);
+        }
+
+        async function salvarNovoNome() {
+            const novoNome = document.getElementById('input-mudar-nome').value.trim();
+            if (!novoNome) return alert("Digite um nome válido!");
+
+            // 1. Atualiza na tabela pública
+            const { error: erroPerfil } = await banco.from('perfis').update({ nome: novoNome }).eq('id', usuarioAtual.id);
+            if (erroPerfil) return alert("Erro ao atualizar nome: " + erroPerfil.message);
+
+            // 2. Atualiza os dados ocultos da conta
+            await banco.auth.updateUser({ data: { nome: novoNome } });
+
+            alert("Nome atualizado com sucesso!");
+            document.getElementById('usuario-saudacao').innerText = `Olá, ${novoNome}!`;
+            document.getElementById('input-mudar-nome').value = '';
+            
+            fecharMenu();
+            calcularEAtualizarRankingGeral(); // Recarrega o ranking com o novo nome
+        }
+        // -------------------------------
+
         function alternarTelas(telaDesejada) {
             if (telaDesejada === 'cadastro') {
                 document.getElementById('login-secao').style.display = 'none';
@@ -301,7 +237,6 @@
         async function fazerLogin() {
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
-
             if (!email || !password) return alert("Preencha e-mail e senha!");
 
             const { data, error } = await banco.auth.signInWithPassword({ email, password });
@@ -315,30 +250,24 @@
             const nome = document.getElementById('cadastro-nome').value;
             const email = document.getElementById('cadastro-email').value;
             const password = document.getElementById('cadastro-password').value;
-
             if (!nome || !email || !password) return alert("Preencha todos os campos!");
 
             const { data, error } = await banco.auth.signUp({
                 email, password, options: { data: { nome: nome } }
             });
-
             if (error) return alert("Erro no cadastro: " + error.message);
 
             alert("Conta criada com sucesso! Entre agora usando seu e-mail e senha.");
-            
-            // Joga o email digitado pro campo de login pra facilitar
             document.getElementById('login-email').value = email;
             document.getElementById('login-password').value = '';
-            
-            // Limpa os dados do cadastro
             document.getElementById('cadastro-nome').value = '';
             document.getElementById('cadastro-email').value = '';
             document.getElementById('cadastro-password').value = '';
-
             alternarTelas('login');
         }
 
         async function deslogar() {
+            fecharMenu();
             await banco.auth.signOut();
             usuarioAtual = null;
             document.getElementById('login-password').value = '';
@@ -423,18 +352,12 @@
                 filtrarJogosNaTela(diaAtivo);
                 calcularEAtualizarRankingGeral();
                 
-            } catch (e) {
-                console.error("Erro ao carregar jogos:", e);
-            }
+            } catch (e) { console.error("Erro ao carregar jogos:", e); }
         }
 
         function filtrarJogosNaTela(diaDesejado) {
             document.querySelectorAll('.jogo-dia').forEach(card => {
-                if (card.getAttribute('data-dia') === diaDesejado) {
-                    card.style.display = 'flex';
-                } else {
-                    card.style.display = 'none';
-                }
+                card.style.display = (card.getAttribute('data-dia') === diaDesejado) ? 'flex' : 'none';
             });
         }
 
@@ -447,10 +370,8 @@
 
                 if (inputP1 && inputP2 && inputP1.value !== '' && inputP2.value !== '') {
                     listaPalpites.push({
-                        usuario_id: usuarioAtual.id,
-                        jogo_id: jogo.id,
-                        palpite_time1: parseInt(inputP1.value),
-                        palpite_time2: parseInt(inputP2.value)
+                        usuario_id: usuarioAtual.id, jogo_id: jogo.id,
+                        palpite_time1: parseInt(inputP1.value), palpite_time2: parseInt(inputP2.value)
                     });
                 }
             });
@@ -481,27 +402,17 @@
 
                 jogos.forEach(jogo => {
                     if (jogo.res1 === null || jogo.res2 === null) return;
-
                     const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
                     if (!palpite) return;
 
-                    const p1 = palpite.palpite_time1;
-                    const p2 = palpite.palpite_time2;
-                    const r1 = jogo.res1;
-                    const r2 = jogo.res2;
+                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                    const r1 = jogo.res1, r2 = jogo.res2;
 
-                    if (p1 === r1 && p2 === r2) {
-                        pontosDoUsuario += 5;
-                    } else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) {
-                        pontosDoUsuario += 3;
-                    }
+                    if (p1 === r1 && p2 === r2) { pontosDoUsuario += 5; } 
+                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { pontosDoUsuario += 3; }
                 });
 
-                tabelaRanking.push({
-                    nome: perfil.nome,
-                    pontos: pontosDoUsuario,
-                    id: perfil.id
-                });
+                tabelaRanking.push({ nome: perfil.nome, pontos: pontosDoUsuario, id: perfil.id });
             });
 
             tabelaRanking.sort((a, b) => b.pontos - a.pontos);
