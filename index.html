@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Bolão Copa 2026</title>
-    <!-- Importando a biblioteca oficial do Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -13,6 +12,11 @@
             --background: #F2F2F2;
             --card: #FFFFFF;
             --text: #333333;
+            
+            /* Novas cores para os resultados dos palpites */
+            --cor-acerto-exato: #28a745;  /* Verde */
+            --cor-acerto-vencedor: #6c757d; /* Cinza */
+            --cor-erro: #dc3545;            /* Vermelho */
         }
 
         body {
@@ -62,18 +66,61 @@
             padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem;
         }
 
+        /* --- ATUALIZAÇÃO DO CARD DOS JOGOS (CSS GRID FIX) --- */
         .jogo-card {
-            background: var(--card); border-radius: 12px; padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
+            background: var(--card); 
+            border-radius: 12px; 
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px;
+            border: 3px solid transparent; /* Borda padrão invisível */
+            transition: border-color 0.3s ease;
         }
+
+        /* Classes das novas bordas de resultado */
+        .jogo-card.acerto-exato { border-color: var(--cor-acerto-exato); }
+        .jogo-card.acerto-vencedor { border-color: var(--cor-acerto-vencedor); }
+        .jogo-card.erro-total { border-color: var(--cor-erro); }
+
         .info-jogo { font-size: 0.8rem; color: #888; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .placar-container { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
-        .time { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 1rem; }
-        .time.mandante { justify-content: flex-end; }
-        .time.visitante { justify-content: flex-start; }
+        
+        .placar-container { 
+            display: grid; 
+            grid-template-columns: 1fr 45px auto 45px 1fr; 
+            align-items: center; 
+            gap: 8px; 
+            font-weight: bold; 
+            width: 100%;
+        }
+        
+        .time { 
+            font-size: 0.9rem; 
+            line-height: 1.2; 
+            word-wrap: break-word; 
+        }
+        
+        .time.mandante { text-align: right; justify-self: end; }
+        .time.visitante { text-align: left; justify-self: start; }
+        
         input[type="number"] {
-            width: 45px; height: 35px; text-align: center; font-size: 1.2rem;
-            font-weight: bold; border: 2px solid #ddd; border-radius: 6px; margin: 0 10px;
+            width: 100%; 
+            height: 38px; 
+            text-align: center; 
+            font-size: 1.1rem;
+            font-weight: bold; 
+            border: 2px solid #ddd; 
+            border-radius: 6px; 
+            margin: 0; 
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        .placar-container span {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #888;
         }
 
         .btn-acao {
@@ -88,24 +135,14 @@
         .link-alternar { text-align: center; font-size: 0.9rem; color: #666; margin-top: 10px; }
         .link-alternar a { color: var(--primary); font-weight: bold; text-decoration: none; }
 
-        /* --- ESTILOS DO MENU LATERAL --- */
-        .btn-header-menu {
-            background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text); padding: 0;
-        }
-        .menu-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 998;
-        }
+        .btn-header-menu { background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text); padding: 0; }
+        .menu-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 998; }
         .menu-lateral {
-            position: fixed; top: 0; right: -280px; width: 280px; height: 100%;
-            background: var(--card); box-shadow: -2px 0 10px rgba(0,0,0,0.1); z-index: 999;
-            transition: right 0.3s ease; padding: 25px 20px; box-sizing: border-box;
-            display: flex; flex-direction: column; gap: 15px;
+            position: fixed; top: 0; right: -280px; width: 280px; height: 100%; background: var(--card); box-shadow: -2px 0 10px rgba(0,0,0,0.1); z-index: 999;
+            transition: right 0.3s ease; padding: 25px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px;
         }
         .menu-lateral.aberto { right: 0; }
-        .btn-fechar-menu {
-            align-self: flex-end; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; margin-bottom: 10px;
-        }
+        .btn-fechar-menu { align-self: flex-end; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -113,7 +150,6 @@
     <h1>🏆 Bolão Copa 2026</h1>
     <p class="subtitle">Mostre que você entende de futebol!</p>
 
-    <!-- TELA DE LOGIN -->
     <div id="login-secao" class="auth-container">
         <h3 class="auth-titulo">Entrar no Bolão</h3>
         <div class="auth-form">
@@ -124,7 +160,6 @@
         </div>
     </div>
 
-    <!-- TELA DE CADASTRO -->
     <div id="cadastro-secao" class="auth-container" style="display: none;">
         <h3 class="auth-titulo">Criar Nova Conta</h3>
         <div class="auth-form">
@@ -136,10 +171,7 @@
         </div>
     </div>
 
-    <!-- TELA PRINCIPAL DO JOGO -->
     <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
-        
-        <!-- CABEÇALHO COM O BOTÃO DE MENU ☰ -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
             <span id="usuario-saudacao" style="font-weight: bold; font-size: 1.1rem;"></span>
             <button class="btn-header-menu" onclick="abrirMenu()">☰</button>
@@ -157,19 +189,14 @@
         </div>
     </div>
 
-    <!-- ESTRUTURA DO MENU LATERAL -->
     <div class="menu-overlay" id="menu-overlay" onclick="fecharMenu()"></div>
     <div class="menu-lateral" id="menu-lateral">
         <button class="btn-fechar-menu" onclick="fecharMenu()">✖</button>
-        
         <h3 style="margin-top: 0; color: var(--primary);">⚙️ Configurações</h3>
-        
         <label style="font-size: 0.9rem; font-weight: bold; color: #555;">Alterar Nome de Exibição:</label>
         <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
         <button class="btn-acao" style="padding: 10px; font-size: 0.9rem;" onclick="salvarNovoNome()">Atualizar Nome</button>
-        
         <hr style="width: 100%; border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        
         <button class="btn-logout" onclick="deslogar()">Sair do Aplicativo</button>
     </div>
 
@@ -183,7 +210,6 @@
         let jogos = [];
         let usuarioAtual = null;
 
-        // --- FUNÇÕES DO MENU LATERAL ---
         function abrirMenu() {
             document.getElementById('menu-overlay').style.display = 'block';
             setTimeout(() => { document.getElementById('menu-lateral').classList.add('aberto'); }, 10);
@@ -198,21 +224,17 @@
             const novoNome = document.getElementById('input-mudar-nome').value.trim();
             if (!novoNome) return alert("Digite um nome válido!");
 
-            // 1. Atualiza na tabela pública
             const { error: erroPerfil } = await banco.from('perfis').update({ nome: novoNome }).eq('id', usuarioAtual.id);
             if (erroPerfil) return alert("Erro ao atualizar nome: " + erroPerfil.message);
 
-            // 2. Atualiza os dados ocultos da conta
             await banco.auth.updateUser({ data: { nome: novoNome } });
 
-            alert("Nome atualizado com sucesso!");
+            alert("Nome updated com sucesso!");
             document.getElementById('usuario-saudacao').innerText = `Olá, ${novoNome}!`;
             document.getElementById('input-mudar-nome').value = '';
-            
             fecharMenu();
-            calcularEAtualizarRankingGeral(); // Recarrega o ranking com o novo nome
+            calcularEAtualizarRankingGeral();
         }
-        // -------------------------------
 
         function alternarTelas(telaDesejada) {
             if (telaDesejada === 'cadastro') {
@@ -296,7 +318,7 @@
                 const resposta = await fetch('jogos.json');
                 jogos = await resposta.json();
 
-                const { data: palpitesSalvos, error } = await banco
+                const { data: palpitesSalvos } = await banco
                     .from('palpites')
                     .select('*')
                     .eq('usuario_id', usuarioAtual.id);
@@ -328,14 +350,34 @@
                     const p2Value = palpite ? palpite.palpite_time2 : '';
 
                     let statusJogo = `${jogo.grupo} • ${jogo.data}`;
+                    let classeResultado = ''; // Nova variável para guardar a classe da borda
+
+                    // SE O JOGO JÁ TEM RESULTADO REAL, DEFINE A CLASSE DA BORDA
                     if (jogo.res1 !== null && jogo.res2 !== null) {
                         statusJogo += ` | (Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
+                        
+                        if (palpite && p1Value !== '' && p2Value !== '') {
+                            const p1 = parseInt(p1Value);
+                            const p2 = parseInt(p2Value);
+                            const r1 = jogo.res1;
+                            const r2 = jogo.res2;
+
+                            if (p1 === r1 && p2 === r2) {
+                                classeResultado = 'acerto-exato'; // Borda Verde (5 pts)
+                            } else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) {
+                                classeResultado = 'acerto-vencedor'; // Borda Cinza (3 pts)
+                            } else {
+                                classeResultado = 'erro-total'; // Borda Vermelha (0 pts)
+                            }
+                        } else {
+                            classeResultado = 'erro-total'; // Se não palpitou, fica vermelho por padrão
+                        }
                     }
 
                     const diaDoJogo = jogo.data.split(' - ')[0];
 
                     const card = `
-                        <div class="jogo-card jogo-dia" data-dia="${diaDoJogo}">
+                        <div class="jogo-card jogo-dia ${classeResultado}" data-dia="${diaDoJogo}">
                             <div class="info-jogo">${statusJogo}</div>
                             <div class="placar-container">
                                 <div class="time mandante">${jogo.time1}</div>
@@ -385,6 +427,7 @@
             } else {
                 alert("Seus palpites foram salvos na nuvem com sucesso! ☁️🎉");
                 calcularEAtualizarRankingGeral();
+                await carregarJogosEJogadores(); // Atualiza a tela para colorir caso o jogo já tenha terminado
             }
         }
 
@@ -401,7 +444,7 @@
                 const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
 
                 jogos.forEach(jogo => {
-                    if (jogo.res1 === null || jogo.res2 === null) return;
+                    if (jogo.res1 === null || juego.res2 === null) return;
                     const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
                     if (!palpite) return;
 
