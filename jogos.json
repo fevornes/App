@@ -5,8 +5,8 @@
     "data": "24/06 - 16:00",
     "time1": "Suíça",
     "time2": "Canadá",
-    "res1": null,
-    "res2": null
+    "res1": 1,
+    "res2": 1
   },
   {
     "id": 2,
@@ -14,8 +14,8 @@
     "data": "24/06 - 16:00",
     "time1": "Bósnia e Herzegovina",
     "time2": "Catar",
-    "res1": null,
-    "res2": null
+    "res1": 1,
+    "res2": 0
   },
   {
     "id": 3,
@@ -23,8 +23,8 @@
     "data": "24/06 - 19:00",
     "time1": "Marrocos",
     "time2": "Haiti",
-    "res1": null,
-    "res2": null
+    "res1": 0,
+    "res2": 1
   },
   {
     "id": 4,
