@@ -110,7 +110,12 @@
         input[type="number"] {
             width: 100%; height: 38px; text-align: center; font-size: 1.1rem;
             font-weight: bold; border: 2px solid #ddd; border-radius: 6px; margin: 0; padding: 0;
-            box-sizing: border-box;
+            box-sizing: border-box; line-height: 38px;
+            -moz-appearance: textfield;
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none; margin: 0;
         }
         
         .placar-container span { text-align: center; font-size: 0.9rem; color: #888; }
@@ -118,7 +123,9 @@
         .btn-acao {
             background-color: var(--primary); color: white; border: none; padding: 12px;
             border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 5px;
+            transition: background-color 0.3s;
         }
+        .btn-acao.desativado { background-color: #bbb; cursor: not-allowed; }
         .btn-logout { background-color: #d93025; padding: 10px; font-size: 1rem; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; width: 100%; }
 
         .ranking-titulo { font-size: 1.2rem; color: var(--primary); margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid var(--secondary); padding-bottom: 5px; }
@@ -135,6 +142,7 @@
             background: var(--card); box-shadow: -2px 0 10px rgba(0,0,0,0.1); z-index: 999;
             transition: right 0.3s ease; padding: 20px; box-sizing: border-box; 
             display: flex; flex-direction: column; gap: 15px; overflow-y: auto;
+            border-radius: 16px 0 0 16px;
         }
         .menu-lateral.aberto { right: 0; }
         
@@ -191,6 +199,7 @@
             <input type="email" id="login-email" placeholder="Seu E-mail">
             <input type="password" id="login-password" placeholder="Sua Senha">
             <button class="btn-acao" onclick="fazerLogin()">Entrar</button>
+            <div style="text-align:center;font-size:0.85rem;margin-top:4px;"><a href="#" onclick="abrirPopupResetSenha()" style="color:#888;">Esqueceu a senha?</a></div>
             <div class="link-alternar">Não tem uma conta? <a href="#" onclick="alternarTelas('cadastro')">Cadastre-se aqui</a></div>
         </div>
     </div>
@@ -209,7 +218,10 @@
     <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
             <span id="usuario-saudacao" style="font-weight: bold; font-size: 1.1rem;"></span>
-            <button class="btn-header-menu" onclick="abrirMenu()">☰</button>
+            <div style="display: flex; gap: 6px;">
+                <button style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text);padding:0;" onclick="abrirPopupFiltros()" title="Meus Resultados">🎯</button>
+                <button class="btn-header-menu" onclick="abrirMenu()">☰</button>
+            </div>
         </div>
 
         <div class="ranking-container">
@@ -220,7 +232,7 @@
         <div id="area-jogos-wrapper">
             <div class="tabs-container" id="dias-tabs"></div>
             <div id="container-jogos"></div>
-            <button class="btn-acao" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
+            <button class="btn-acao desativado" id="btn-salvar" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
         </div>
     </div>
 
@@ -313,6 +325,17 @@
         </div>
     </div>
 
+    <div class="popup-notificacao" id="popup-reset-senha">
+        <div class="popup-conteudo">
+            <button onclick="fecharPopupResetSenha()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">🔑 Recuperar Senha</h3>
+            <p style="color:#555;font-size:0.9rem;margin-bottom:15px;">Digite seu e-mail e enviaremos um link para redefinir sua senha.</p>
+            <input type="email" id="reset-email" placeholder="Seu E-mail" style="margin-bottom:12px;">
+            <button class="btn-acao" onclick="enviarResetSenha()">Enviar Link</button>
+            <button style="background:none;border:none;color:#888;font-size:0.85rem;cursor:pointer;margin-top:10px;width:100%;padding:8px;" onclick="fecharPopupResetSenha()">Cancelar</button>
+        </div>
+    </div>
+
     <script>
         const SUPABASE_URL = "https://ixnqcwilmvgzkxfmkfaq.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnFjd2lsbXZnemt4Zm1rZmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTQ1NTMsImV4cCI6MjA5NzczMDU1M30.-LqUvPwThvgZw8T5iADZn-I3L-XJvmMFyVqD3rgToq8";
@@ -321,6 +344,7 @@
 
         let jogos = [];
         let usuarioAtual = null;
+        let valoresOriginais = {};
 
         function jogoJaComecou(dataStr) {
             const partes = dataStr.split(' - ');
@@ -383,6 +407,22 @@
             document.getElementById('input-mudar-nome').value = '';
             fecharMenu();
             calcularEAtualizarRankingGeral();
+        }
+
+        function abrirPopupResetSenha() {
+            document.getElementById('popup-reset-senha').style.display = 'flex';
+            document.getElementById('reset-email').value = document.getElementById('login-email').value;
+        }
+        function fecharPopupResetSenha() {
+            document.getElementById('popup-reset-senha').style.display = 'none';
+        }
+        async function enviarResetSenha() {
+            const email = document.getElementById('reset-email').value.trim();
+            if (!email) return alert("Digite seu e-mail!");
+            const { error } = await banco.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+            if (error) return alert("Erro: " + error.message);
+            alert("Link de redefinição enviado para " + email + "! Verifique sua caixa de entrada.");
+            fecharPopupResetSenha();
         }
 
         function alternarTelas(telaDesejada) {
@@ -460,6 +500,7 @@
             document.getElementById('usuario-saudacao').innerText = `Olá, ${data ? data.nome : 'Jogador'}!`;
 
             await carregarJogosEJogadores();
+            await carregarPalpitesFiltro();
         }
 
         async function carregarJogosEJogadores() {
@@ -543,6 +584,18 @@
 
                 filtrarJogosNaTela(diaAtivo);
                 calcularEAtualizarRankingGeral();
+
+                valoresOriginais = {};
+                jogos.forEach(jogo => {
+                    const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                    const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                    if (p1 && p2) {
+                        valoresOriginais[`${jogo.id}_p1`] = p1.value;
+                        valoresOriginais[`${jogo.id}_p2`] = p2.value;
+                        p1.oninput = p2.oninput = atualizarEstadoBotao;
+                    }
+                });
+                atualizarEstadoBotao();
                 
             } catch (e) { console.error("Erro ao carregar do banco:", e); }
         }
@@ -551,6 +604,23 @@
             document.querySelectorAll('.jogo-dia').forEach(card => {
                 card.style.display = (card.getAttribute('data-dia') === diaDesejado) ? 'flex' : 'none';
             });
+        }
+
+        function atualizarEstadoBotao() {
+            const btn = document.getElementById('btn-salvar');
+            let alterou = false;
+            jogos.forEach(jogo => {
+                const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                if (p1 && p2 && (p1.value !== valoresOriginais[`${jogo.id}_p1`] || p2.value !== valoresOriginais[`${jogo.id}_p2`])) {
+                    alterou = true;
+                }
+            });
+            if (alterou) {
+                btn.classList.remove('desativado');
+            } else {
+                btn.classList.add('desativado');
+            }
         }
 
         async function salvarPalpitesNoBanco() {
@@ -577,6 +647,15 @@
                 alert("Erro ao salvar palpites: " + error.message);
             } else {
                 alert("Seus palpites foram salvos na nuvem com sucesso!");
+                jogos.forEach(jogo => {
+                    const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                    const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                    if (p1 && p2) {
+                        valoresOriginais[`${jogo.id}_p1`] = p1.value;
+                        valoresOriginais[`${jogo.id}_p2`] = p2.value;
+                    }
+                });
+                atualizarEstadoBotao();
                 calcularEAtualizarRankingGeral();
                 await carregarJogosEJogadores();
             }
@@ -613,16 +692,87 @@
 
             const divRanking = document.getElementById('tabela-ranking');
             divRanking.innerHTML = '';
+            const expandido = divRanking.dataset.expandido === 'true';
 
             tabelaRanking.forEach((item, index) => {
                 const ehVoce = item.id === usuarioAtual.id ? 'voce' : '';
+                const oculto = index >= 3 && !expandido && !ehVoce ? 'style="display:none;"' : '';
                 divRanking.innerHTML += `
-                    <div class="ranking-linha ${ehVoce}">
+                    <div class="ranking-linha ${ehVoce}" ${oculto}>
                         <div><strong>${index + 1}º</strong> ${item.nome}</div>
                         <div>${item.pontos} pts</div>
                     </div>
                 `;
             });
+
+            if (tabelaRanking.length > 3) {
+                divRanking.innerHTML += `
+                    <div style="text-align:center;margin-top:8px;">
+                        <button onclick="alternarRanking()" style="background:none;border:none;color:var(--primary);font-weight:bold;cursor:pointer;font-size:0.85rem;">
+                            ${expandido ? '▲ Mostrar menos' : '▼ Ver todos (' + tabelaRanking.length + ')'}
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function abrirPopupFiltros() {
+            document.getElementById('popup-filtros').style.display = 'flex';
+            mudarAbaFiltro('cravada');
+        }
+        function fecharPopupFiltros() {
+            document.getElementById('popup-filtros').style.display = 'none';
+        }
+        function mudarAbaFiltro(tipo) {
+            document.querySelectorAll('#popup-filtros .t-tab-btn').forEach(b => b.classList.remove('ativo'));
+            document.getElementById('filtro-tab-' + tipo).classList.add('ativo');
+
+            const div = document.getElementById('lista-filtros');
+            div.innerHTML = '';
+            let total = 0;
+
+            jogos.forEach(jogo => {
+                if (jogo.res1 === null || jogo.res2 === null) return;
+                const palpite = palpitesSalvosFiltro ? palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id) : null;
+                if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
+
+                const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                const r1 = jogo.res1, r2 = jogo.res2;
+                let categoria = 'errou';
+                if (p1 === r1 && p2 === r2) categoria = 'cravada';
+                else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) categoria = 'acertou';
+
+                if (categoria !== tipo) return;
+                total++;
+
+                div.innerHTML += `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;gap:8px;">
+                        <div style="flex:1;min-width:0;">
+                            <strong>${jogo.time1}</strong> vs <strong>${jogo.time2}</strong>
+                            <div style="font-size:0.75rem;color:#888;">${jogo.grupo} • ${jogo.data}</div>
+                        </div>
+                        <div style="text-align:right;white-space:nowrap;">
+                            Seu: ${p1}-${p2}<br>
+                            <span style="color:#666;">Real: ${r1}-${r2}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (total === 0) {
+                div.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">Nenhum resultado nessa categoria ainda.</div>';
+            }
+        }
+        let palpitesSalvosFiltro = [];
+        async function carregarPalpitesFiltro() {
+            const { data } = await banco.from('palpites').select('*').eq('usuario_id', usuarioAtual.id);
+            palpitesSalvosFiltro = data || [];
+        }
+
+        function alternarRanking() {
+            const div = document.getElementById('tabela-ranking');
+            div.dataset.expandido = div.dataset.expandido === 'true' ? 'false' : 'true';
+            calcularEAtualizarRankingGeral();
         }
 
         verificarSessao();
@@ -668,6 +818,20 @@
             }
         }
     </script>
+
+    <div class="popup-notificacao" id="popup-filtros">
+        <div class="popup-conteudo" style="max-width: 500px;">
+            <button onclick="fecharPopupFiltros()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">📊 Meus Resultados</h3>
+            <div class="tutorial-tabs">
+                <button class="t-tab-btn ativo" id="filtro-tab-cravada" onclick="mudarAbaFiltro('cravada')">🎯 Cravadas</button>
+                <button class="t-tab-btn" id="filtro-tab-acertou" onclick="mudarAbaFiltro('acertou')">✅ Acertou</button>
+                <button class="t-tab-btn" id="filtro-tab-errou" onclick="mudarAbaFiltro('errou')">❌ Errou</button>
+            </div>
+            <div id="lista-filtros" style="text-align:left;max-height:350px;overflow-y:auto;padding-right:5px;font-size:0.85rem;"></div>
+            <button class="btn-acao" style="margin-top:15px;background:#666;" onclick="fecharPopupFiltros()">Fechar</button>
+        </div>
+    </div>
 
     <div class="popup-notificacao" id="popup-admin" style="display: none;">
         <div class="popup-conteudo" style="max-width: 500px;">
