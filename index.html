@@ -89,9 +89,17 @@
             width: 100%;
         }
         
-        .time { font-size: 0.9rem; line-height: 1.2; word-wrap: break-word; }
-        .time.mandante { text-align: right; justify-self: end; }
-        .time.visitante { text-align: left; justify-self: start; }
+        /* --- AQUI ESTÁ A MUDANÇA DE ALINHAMENTO --- */
+        .time { 
+            font-size: 0.9rem; 
+            line-height: 1.2; 
+            word-wrap: break-word; 
+            text-align: center; /* Centraliza o texto das seleções */
+            width: 100%;
+        }
+        .time.mandante { justify-self: center; }
+        .time.visitante { justify-self: center; }
+        /* ------------------------------------------- */
         
         input[type="number"] {
             width: 100%; height: 38px; text-align: center; font-size: 1.1rem;
@@ -113,7 +121,6 @@
         .link-alternar { text-align: center; font-size: 0.9rem; color: #666; margin-top: 10px; }
         .link-alternar a { color: var(--primary); font-weight: bold; text-decoration: none; }
 
-        /* --- ATUALIZAÇÕES DO MENU LATERAL --- */
         .btn-header-menu { background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text); padding: 0; }
         .menu-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 998; }
         
@@ -143,7 +150,6 @@
         .cor-box.vencedor { border-color: var(--cor-acerto-vencedor); background: #f8f9fa; }
         .cor-box.erro { border-color: var(--cor-erro); background: #fdeaea; }
 
-        /* --- POP-UP DE AVISO --- */
         .popup-notificacao {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
@@ -164,7 +170,6 @@
     <h1>🏆 Bolão Copa 2026</h1>
     <p class="subtitle">Mostre que você entende de futebol!</p>
 
-    <!-- TELA DE LOGIN -->
     <div id="login-secao" class="auth-container">
         <h3 class="auth-titulo">Entrar no Bolão</h3>
         <div class="auth-form">
@@ -175,7 +180,6 @@
         </div>
     </div>
 
-    <!-- TELA DE CADASTRO -->
     <div id="cadastro-secao" class="auth-container" style="display: none;">
         <h3 class="auth-titulo">Criar Nova Conta</h3>
         <div class="auth-form">
@@ -187,7 +191,6 @@
         </div>
     </div>
 
-    <!-- TELA PRINCIPAL DO JOGO -->
     <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
             <span id="usuario-saudacao" style="font-weight: bold; font-size: 1.1rem;"></span>
@@ -206,14 +209,12 @@
         </div>
     </div>
 
-    <!-- MENU LATERAL RENOVADO -->
     <div class="menu-overlay" id="menu-overlay" onclick="fecharMenu()"></div>
     <div class="menu-lateral" id="menu-lateral">
         <button class="btn-fechar-menu" onclick="fecharMenu()">✖</button>
         
         <h3 style="margin-top: -10px; margin-bottom: 5px; color: var(--primary); font-size: 1.3rem;">⚙️ Menu</h3>
         
-        <!-- 1. Alterar Nome -->
         <div class="menu-section">
             <p class="menu-section-title">👤 Alterar Perfil</p>
             <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
@@ -222,7 +223,6 @@
 
         <hr class="menu-divisor">
 
-        <!-- 2. Regras de Pontuação -->
         <div class="menu-section">
             <p class="menu-section-title">📏 Regra de Pontuação</p>
             <div class="info-box">
@@ -234,7 +234,6 @@
 
         <hr class="menu-divisor">
 
-        <!-- 3. Legenda -->
         <div class="menu-section">
             <p class="menu-section-title">🎨 Legenda de Cores</p>
             <div class="info-box">
@@ -246,11 +245,9 @@
 
         <hr class="menu-divisor">
 
-        <!-- 4. Sair -->
         <button class="btn-logout" style="margin-top: 5px;" onclick="deslogar()">Sair do Aplicativo</button>
     </div>
 
-    <!-- POP-UP DE AVISO (NOTIFICAÇÃO) -->
     <div class="popup-notificacao" id="popup-aviso">
         <div class="popup-conteudo">
             <h3 class="popup-titulo">⚽ Ranking Atualizado!</h3>
