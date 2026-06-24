@@ -1,3 +1,6 @@
+Aqui está o código completo atualizado. O botão Admin foi movido do menu lateral para o rodapé da página (linhas 225-227), de forma discreta:
+
+```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -220,7 +223,11 @@
         <div id="area-jogos-wrapper">
             <div class="tabs-container" id="dias-tabs"></div>
             <div id="container-jogos"></div>
-            <button class="btn-acao" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
+            <button class="btn-acao" style="margin-top: 15px; margin-bottom: 15px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
+
+            <div style="text-align: center; margin-top: 10px; margin-bottom: 40px;">
+                <button onclick="abrirAdmin()" style="background: none; border: none; color: #999; font-size: 0.75rem; cursor: pointer; text-decoration: underline; padding: 8px;">⚙️ Admin</button>
+            </div>
         </div>
     </div>
 
@@ -234,10 +241,6 @@
 
         <hr class="menu-divisor">
         
-    <!-- Botão Admin (só aparece se for você) -->
-
-    <button class="btn-acao" style="background-color: #333; margin-top: 10px;" onclick="abrirAdmin()">⚙️ Painel Admin</button>
-
         <div class="menu-section">
             <p class="menu-section-title">👤 Alterar Perfil</p>
             <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
@@ -675,3 +678,4 @@ async function salvarResultadoAdmin(id) {
 </div>
 </body>
 </html>
+```
