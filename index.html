@@ -322,6 +322,16 @@
         let jogos = [];
         let usuarioAtual = null;
 
+        function jogoJaComecou(dataStr) {
+            const partes = dataStr.split(' - ');
+            const dataParts = partes[0].split('/');
+            const dia = parseInt(dataParts[0]);
+            const mes = parseInt(dataParts[1]) - 1;
+            const hora = partes[1] || '00:00';
+            const jogoDate = new Date(2026, mes, dia, ...hora.split(':'));
+            return new Date() >= jogoDate;
+        }
+
         function abrirTutorialInstalacao() {
             fecharMenu();
             document.getElementById('popup-tutorial').style.display = 'flex';
@@ -511,17 +521,21 @@
                     }
 
                     const diaDoJogo = jogo.data.split(' - ')[0];
+                    const encerrado = jogoJaComecou(jogo.data);
+                    const disabledAttr = encerrado ? 'disabled' : '';
+                    const labelEncerrado = encerrado ? '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Palpite encerrado</div>' : '';
 
                     const card = `
                         <div class="jogo-card jogo-dia ${classeResultado}" data-dia="${diaDoJogo}">
                             <div class="info-jogo">${statusJogo}</div>
                             <div class="placar-container">
                                 <div class="time mandante">${jogo.time1}</div>
-                                <input type="number" id="jogo_${jogo.id}_p1" min="0" value="${p1Value}">
+                                <input type="number" id="jogo_${jogo.id}_p1" min="0" value="${p1Value}" ${disabledAttr}>
                                 <span>X</span>
-                                <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}">
+                                <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}" ${disabledAttr}>
                                 <div class="time visitante">${jogo.time2}</div>
                             </div>
+                            ${labelEncerrado}
                         </div>
                     `;
                     container.innerHTML += card;
@@ -543,6 +557,7 @@
             const listaPalpites = [];
 
             jogos.forEach(jogo => {
+                if (jogoJaComecou(jogo.data)) return;
                 const inputP1 = document.getElementById(`jogo_${jogo.id}_p1`);
                 const inputP2 = document.getElementById(`jogo_${jogo.id}_p2`);
 
