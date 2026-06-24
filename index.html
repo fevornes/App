@@ -451,93 +451,91 @@
         }
 
         async function carregarJogosEJogadores() {
-            try {
-                const resposta = await fetch('jogos.json');
-                const dadosArquivo = await resposta.json();
+    try {
+        // Buscando os jogos direto do Supabase (tabela 'jogos')
+        const { data: jogosDoBanco, error: erroJogos } = await banco
+            .from('jogos')
+            .select('*')
+            .order('id', { ascending: true });
+
+        if (erroJogos) throw erroJogos;
+        
+        jogos = jogosDoBanco;
+
+        // --- SISTEMA DE NOTIFICAÇÃO (MANTIDO) ---
+        // Como agora é banco, podemos remover a lógica de data do JSON e focar no estado do jogo
+        // ----------------------------------------
+
+        const { data: palpitesSalvos } = await banco
+            .from('palpites')
+            .select('*')
+            .eq('usuario_id', usuarioAtual.id);
+
+        const container = document.getElementById('container-jogos');
+        container.innerHTML = '';
+
+        const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
+        let diaAtivo = diasUnicos.length > 0 ? diasUnicos[0] : '';
+
+        const tabsContainer = document.getElementById('dias-tabs');
+        tabsContainer.innerHTML = '';
+        
+        diasUnicos.forEach(dia => {
+            const btn = document.createElement('button');
+            btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
+            btn.innerText = `Dia ${dia}`;
+            btn.onclick = () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
+                btn.classList.add('ativo');
+                filtrarJogosNaTela(dia);
+            };
+            tabsContainer.appendChild(btn);
+        });
+
+        jogos.forEach(jogo => {
+            const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
+            const p1Value = palpite ? palpite.palpite_time1 : '';
+            const p2Value = palpite ? palpite.palpite_time2 : '';
+
+            let statusJogo = `${jogo.grupo} • ${jogo.data}`;
+            let classeResultado = '';
+
+            // Lógica de cores baseada no banco
+            if (jogo.res1 !== null && jogo.res2 !== null) {
+                statusJogo += ` | (Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
                 
-                const stringUltimaAtualizacao = dadosArquivo.ultima_atualizacao || "";
-                jogos = dadosArquivo.lista_jogos || dadosArquivo;
+                if (palpite !== undefined && palpite !== null && p1Value !== '' && p2Value !== '') {
+                    const p1 = parseInt(p1Value), p2 = parseInt(p2Value);
+                    const r1 = jogo.res1, r2 = jogo.res2;
 
-                if (stringUltimaAtualizacao) {
-                    const ultimaVistaSalva = localStorage.getItem('ultima_atualizacao_vista');
-                    if (ultimaVistaSalva !== stringUltimaAtualizacao) {
-                        if (ultimaVistaSalva !== null) {
-                            document.getElementById('popup-texto-data').innerText = `Novos resultados oficiais foram adicionados (${stringUltimaAtualizacao}). Venha conferir a classificação geral!`;
-                            document.getElementById('popup-aviso').style.display = 'flex';
-                        }
-                        localStorage.setItem('ultima_atualizacao_vista', stringUltimaAtualizacao);
-                    }
-                }
+                    if (p1 === r1 && p2 === r2) { classeResultado = 'acerto-exato'; } 
+                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { classeResultado = 'acerto-vencedor'; } 
+                    else { classeResultado = 'erro-total'; }
+                } else { classeResultado = 'erro-total'; }
+            }
 
-                const { data: palpitesSalvos } = await banco
-                    .from('palpites')
-                    .select('*')
-                    .eq('usuario_id', usuarioAtual.id);
+            const diaDoJogo = jogo.data.split(' - ')[0];
 
-                const container = document.getElementById('container-jogos');
-                container.innerHTML = '';
+            const card = `
+                <div class="jogo-card jogo-dia ${classeResultado}" data-dia="${diaDoJogo}">
+                    <div class="info-jogo">${statusJogo}</div>
+                    <div class="placar-container">
+                        <div class="time mandante">${jogo.time1}</div>
+                        <input type="number" id="jogo_${jogo.id}_p1" min="0" value="${p1Value}">
+                        <span>X</span>
+                        <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}">
+                        <div class="time visitante">${jogo.time2}</div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += card;
+        });
 
-                const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
-                let diaAtivo = diasUnicos.length > 0 ? diasUnicos[0] : '';
-
-                const tabsContainer = document.getElementById('dias-tabs');
-                tabsContainer.innerHTML = '';
-                
-                diasUnicos.forEach(dia => {
-                    const btn = document.createElement('button');
-                    btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
-                    btn.innerText = `Dia ${dia}`;
-                    btn.onclick = () => {
-                        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
-                        btn.classList.add('ativo');
-                        filtrarJogosNaTela(dia);
-                    };
-                    tabsContainer.appendChild(btn);
-                });
-
-                jogos.forEach(jogo => {
-                    const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
-                    const p1Value = palpite ? palpite.palpite_time1 : '';
-                    const p2Value = palpite ? palpite.palpite_time2 : '';
-
-                    let statusJogo = `${jogo.grupo} • ${jogo.data}`;
-                    let classeResultado = '';
-
-                    if (jogo.res1 !== null && jogo.res2 !== null) {
-                        statusJogo += ` | (Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
-                        
-                        if (palpite && p1Value !== '' && p2Value !== '') {
-                            const p1 = parseInt(p1Value), p2 = parseInt(p2Value);
-                            const r1 = jogo.res1, r2 = jogo.res2;
-
-                            if (p1 === r1 && p2 === r2) { classeResultado = 'acerto-exato'; } 
-                            else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { classeResultado = 'acerto-vencedor'; } 
-                            else { classeResultado = 'erro-total'; }
-                        } else { classeResultado = 'erro-total'; }
-                    }
-
-                    const diaDoJogo = jogo.data.split(' - ')[0];
-
-                    const card = `
-                        <div class="jogo-card jogo-dia ${classeResultado}" data-dia="${diaDoJogo}">
-                            <div class="info-jogo">${statusJogo}</div>
-                            <div class="placar-container">
-                                <div class="time mandante">${jogo.time1}</div>
-                                <input type="number" id="jogo_${jogo.id}_p1" min="0" value="${p1Value}">
-                                <span>X</span>
-                                <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}">
-                                <div class="time visitante">${jogo.time2}</div>
-                            </div>
-                        </div>
-                    `;
-                    container.innerHTML += card;
-                });
-
-                filtrarJogosNaTela(diaAtivo);
-                calcularEAtualizarRankingGeral();
-                
-            } catch (e) { console.error("Erro ao carregar jogos:", e); }
-        }
+        filtrarJogosNaTela(diaAtivo);
+        calcularEAtualizarRankingGeral();
+        
+    } catch (e) { console.error("Erro ao carregar do banco:", e); }
+}
 
         function filtrarJogosNaTela(diaDesejado) {
             document.querySelectorAll('.jogo-dia').forEach(card => {
