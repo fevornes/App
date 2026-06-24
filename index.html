@@ -444,7 +444,7 @@
                 const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
 
                 jogos.forEach(jogo => {
-                    if (jogo.res1 === null || juego.res2 === null) return;
+                    if (jogo.res1 === null || jogo.res2 === null) return;
                     const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
                     if (!palpite) return;
 
