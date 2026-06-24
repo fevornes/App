@@ -234,6 +234,10 @@
 
         <hr class="menu-divisor">
         
+    <!-- Botão Admin (só aparece se for você) -->
+
+    <button class="btn-acao" style="background-color: #333; margin-top: 10px;" onclick="abrirAdmin()">⚙️ Painel Admin</button>
+
         <div class="menu-section">
             <p class="menu-section-title">👤 Alterar Perfil</p>
             <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
@@ -615,7 +619,59 @@
         }
 
         verificarSessao();
-    </script>
+    function fecharAdmin() {
+    document.getElementById('popup-admin').style.display = 'none';
+}
 
+function abrirAdmin() {
+    // Verificação de segurança simples (a proteção real está no Banco de Dados)
+    if (usuarioAtual.email !== 'SEU_EMAIL_AQUI') {
+        return alert("Acesso negado!");
+    }
+
+    document.getElementById('popup-admin').style.display = 'flex';
+    const container = document.getElementById('lista-jogos-admin');
+    container.innerHTML = '';
+    
+    jogos.forEach(jogo => {
+        container.innerHTML += `
+            <div style="margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:10px; display: flex; align-items: center; gap: 10px;">
+                <span style="flex-grow: 1; font-size: 0.9rem;">${jogo.time1} x ${jogo.time2}</span>
+                <input type="number" id="adm_r1_${jogo.id}" value="${jogo.res1 !== null ? jogo.res1 : ''}" style="width:40px; padding: 5px;">
+                <span>x</span>
+                <input type="number" id="adm_r2_${jogo.id}" value="${jogo.res2 !== null ? jogo.res2 : ''}" style="width:40px; padding: 5px;">
+                <button onclick="salvarResultadoAdmin(${jogo.id})" style="padding: 5px 10px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">Salvar</button>
+            </div>
+        `;
+    });
+}
+
+async function salvarResultadoAdmin(id) {
+    const r1 = document.getElementById('adm_r1_'+id).value;
+    const r2 = document.getElementById('adm_r2_'+id).value;
+    
+    // Atualiza no banco
+    const { error } = await banco.from('jogos').update({ res1: parseInt(r1), res2: parseInt(r2) }).eq('id', id);
+    
+    if(error) {
+        alert("Erro ao salvar: " + error.message);
+    } else {
+        alert("Resultado salvo! O ranking será atualizado.");
+        fecharAdmin();
+        await carregarJogosEJogadores(); // Atualiza a tela
+    }
+}
+    </script>
+<!-- PAINEL ADMINISTRATIVO (Oculto) -->
+<div class="popup-notificacao" id="popup-admin" style="display: none;">
+    <div class="popup-conteudo" style="max-width: 500px;">
+        <h3 class="popup-titulo">⚙️ Painel de Adm</h3>
+        <p style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">Atualize os resultados oficiais aqui:</p>
+        <div id="lista-jogos-admin" style="text-align: left; max-height: 350px; overflow-y: auto; padding-right: 10px;">
+            <!-- Os jogos serão carregados aqui -->
+        </div>
+        <button class="btn-acao" style="margin-top: 15px; background: #666;" onclick="fecharAdmin()">Fechar</button>
+    </div>
+</div>
 </body>
 </html>
