@@ -48,6 +48,13 @@
             box-sizing: border-box;
         }
 
+        .auth-titulo {
+            text-align: center;
+            color: var(--primary);
+            margin-top: 5px;
+            margin-bottom: 20px;
+        }
+
         #area-jogos-wrapper {
             background: transparent;
             padding: 0;
@@ -60,7 +67,6 @@
             gap: 15px;
         }
 
-        /* --- NOVOS ESTILOS PARA AS ABAS DE DIAS --- */
         .tabs-container {
             display: flex;
             overflow-x: auto;
@@ -70,14 +76,8 @@
             width: 100%;
         }
         
-        .tabs-container::-webkit-scrollbar {
-            height: 6px;
-        }
-        
-        .tabs-container::-webkit-scrollbar-thumb {
-            background-color: #ccc;
-            border-radius: 10px;
-        }
+        .tabs-container::-webkit-scrollbar { height: 6px; }
+        .tabs-container::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
 
         .tab-btn {
             padding: 8px 16px;
@@ -96,16 +96,15 @@
             color: white;
             border-color: var(--primary);
         }
-        /* ------------------------------------------ */
 
         .auth-form {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
         input[type="text"], input[type="email"], input[type="password"] {
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 1rem;
@@ -202,22 +201,49 @@
             font-weight: bold;
             border-radius: 6px;
         }
+
+        .link-alternar {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 10px;
+        }
+        .link-alternar a {
+            color: var(--primary);
+            font-weight: bold;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
 
     <h1>🏆 Bolão Copa 2026</h1>
-    <p class="subtitle">Agora conectado ao banco de dados na nuvem!</p>
+    <p class="subtitle">Mostre que você entende de futebol!</p>
 
-    <!-- TELA DE LOGIN / CADASTRO -->
-    <div id="auth-secao" class="auth-container">
-        <h3 id="auth-titulo">Entrar no Bolão</h3>
+    <!-- TELA DE LOGIN (Padrao) -->
+    <div id="login-secao" class="auth-container">
+        <h3 class="auth-titulo">Entrar no Bolão</h3>
         <div class="auth-form">
-            <input type="text" id="auth-nome" placeholder="Seu Nome (Apenas para Cadastro)">
-            <input type="email" id="auth-email" placeholder="Seu E-mail">
-            <input type="password" id="auth-password" placeholder="Sua Senha">
-            <button class="btn-acao" onclick="autenticar(true)">Entrar</button>
-            <button class="btn-acao" style="background-color: #666;" onclick="autenticar(false)">Criar Nova Conta</button>
+            <input type="email" id="login-email" placeholder="Seu E-mail">
+            <input type="password" id="login-password" placeholder="Sua Senha">
+            <button class="btn-acao" onclick="fazerLogin()">Entrar</button>
+            <div class="link-alternar">
+                Não tem uma conta? <a href="#" onclick="alternarTelas('cadastro')">Cadastre-se aqui</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- TELA DE CADASTRO (Escondida por padrao) -->
+    <div id="cadastro-secao" class="auth-container" style="display: none;">
+        <h3 class="auth-titulo">Criar Nova Conta</h3>
+        <div class="auth-form">
+            <input type="text" id="cadastro-nome" placeholder="Seu Nome e Sobrenome">
+            <input type="email" id="cadastro-email" placeholder="Seu E-mail">
+            <input type="password" id="cadastro-password" placeholder="Crie uma Senha">
+            <button class="btn-acao" style="background-color: var(--secondary); color: var(--text);" onclick="fazerCadastro()">Confirmar Cadastro</button>
+            <div class="link-alternar">
+                Já tem conta? <a href="#" onclick="alternarTelas('login')">Faça login</a>
+            </div>
         </div>
     </div>
 
@@ -228,20 +254,14 @@
             <button class="btn-logout" onclick="deslogar()">Sair</button>
         </div>
 
-        <!-- RANKING REAL -->
         <div class="ranking-container">
             <h3 class="ranking-titulo">📊 Classificação Geral</h3>
             <div id="tabela-ranking">Carregando classificação...</div>
         </div>
 
-        <!-- PALPITES -->
         <div id="area-jogos-wrapper">
-            <!-- As abas dos dias aparecerão aqui -->
             <div class="tabs-container" id="dias-tabs"></div>
-            
-            <!-- Os jogos aparecerão aqui -->
             <div id="container-jogos"></div>
-            
             <button class="btn-acao" style="margin-top: 15px; margin-bottom: 40px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
         </div>
     </div>
@@ -257,6 +277,17 @@
         let jogos = [];
         let usuarioAtual = null;
 
+        // Funcao para trocar entre Login e Cadastro
+        function alternarTelas(telaDesejada) {
+            if (telaDesejada === 'cadastro') {
+                document.getElementById('login-secao').style.display = 'none';
+                document.getElementById('cadastro-secao').style.display = 'block';
+            } else {
+                document.getElementById('cadastro-secao').style.display = 'none';
+                document.getElementById('login-secao').style.display = 'block';
+            }
+        }
+
         async function verificarSessao() {
             const { data: { session } } = await banco.auth.getSession();
             if (session) {
@@ -267,42 +298,62 @@
             }
         }
 
-        async function autenticar(ehLogin) {
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
-            const nome = document.getElementById('auth-nome').value;
+        async function fazerLogin() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
 
             if (!email || !password) return alert("Preencha e-mail e senha!");
 
-            if (ehLogin) {
-                const { data, error } = await banco.auth.signInWithPassword({ email, password });
-                if (error) return alert("Erro no login: " + error.message);
-                usuarioAtual = data.user;
-            } else {
-                if (!nome) return alert("Digite seu nome para criar a conta!");
-                const { data, error } = await banco.auth.signUp({
-                    email, password, options: { data: { nome: nome } }
-                });
-                if (error) return alert("Erro no cadastro: " + error.message);
-                alert("Conta criada com sucesso! Entre usando seus dados.");
-                return;
-            }
+            const { data, error } = await banco.auth.signInWithPassword({ email, password });
+            if (error) return alert("Erro no login. Verifique seu e-mail e senha.");
+            
+            usuarioAtual = data.user;
             mostrarPainelJogo();
+        }
+
+        async function fazerCadastro() {
+            const nome = document.getElementById('cadastro-nome').value;
+            const email = document.getElementById('cadastro-email').value;
+            const password = document.getElementById('cadastro-password').value;
+
+            if (!nome || !email || !password) return alert("Preencha todos os campos!");
+
+            const { data, error } = await banco.auth.signUp({
+                email, password, options: { data: { nome: nome } }
+            });
+
+            if (error) return alert("Erro no cadastro: " + error.message);
+
+            alert("Conta criada com sucesso! Entre agora usando seu e-mail e senha.");
+            
+            // Joga o email digitado pro campo de login pra facilitar
+            document.getElementById('login-email').value = email;
+            document.getElementById('login-password').value = '';
+            
+            // Limpa os dados do cadastro
+            document.getElementById('cadastro-nome').value = '';
+            document.getElementById('cadastro-email').value = '';
+            document.getElementById('cadastro-password').value = '';
+
+            alternarTelas('login');
         }
 
         async function deslogar() {
             await banco.auth.signOut();
             usuarioAtual = null;
+            document.getElementById('login-password').value = '';
             mostrarPainelLogin();
         }
 
         function mostrarPainelLogin() {
-            document.getElementById('auth-secao').style.display = 'block';
+            document.getElementById('cadastro-secao').style.display = 'none';
             document.getElementById('jogo-secao').style.display = 'none';
+            document.getElementById('login-secao').style.display = 'block';
         }
 
         async function mostrarPainelJogo() {
-            document.getElementById('auth-secao').style.display = 'none';
+            document.getElementById('login-secao').style.display = 'none';
+            document.getElementById('cadastro-secao').style.display = 'none';
             document.getElementById('jogo-secao').style.display = 'block';
             
             const { data } = await banco.from('perfis').select('nome').eq('id', usuarioAtual.id).single();
@@ -324,11 +375,9 @@
                 const container = document.getElementById('container-jogos');
                 container.innerHTML = '';
 
-                // 1. EXTRAIR OS DIAS ÚNICOS PARA CRIAR AS ABAS
                 const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
-                let diaAtivo = diasUnicos.length > 0 ? diasUnicos[0] : ''; // O primeiro dia começa selecionado
+                let diaAtivo = diasUnicos.length > 0 ? diasUnicos[0] : '';
 
-                // 2. CRIAR OS BOTÕES DAS ABAS
                 const tabsContainer = document.getElementById('dias-tabs');
                 tabsContainer.innerHTML = '';
                 
@@ -337,16 +386,13 @@
                     btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
                     btn.innerText = `Dia ${dia}`;
                     btn.onclick = () => {
-                        // Atualiza as cores dos botões
                         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
                         btn.classList.add('ativo');
-                        // Mostra apenas os jogos desse dia
                         filtrarJogosNaTela(dia);
                     };
                     tabsContainer.appendChild(btn);
                 });
 
-                // 3. CRIAR TODOS OS JOGOS NA TELA (COM CLASSE DE IDENTIFICAÇÃO DO DIA)
                 jogos.forEach(jogo => {
                     const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
                     const p1Value = palpite ? palpite.palpite_time1 : '';
@@ -354,7 +400,7 @@
 
                     let statusJogo = `${jogo.grupo} • ${jogo.data}`;
                     if (jogo.res1 !== null && jogo.res2 !== null) {
-                        statusJogo += ` | (Resultado Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
+                        statusJogo += ` | (Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
                     }
 
                     const diaDoJogo = jogo.data.split(' - ')[0];
@@ -374,7 +420,6 @@
                     container.innerHTML += card;
                 });
 
-                // Inicia filtrando para mostrar apenas o primeiro dia
                 filtrarJogosNaTela(diaAtivo);
                 calcularEAtualizarRankingGeral();
                 
@@ -383,7 +428,6 @@
             }
         }
 
-        // FUNÇÃO QUE ESCONDE/MOSTRA OS JOGOS DE ACORDO COM A ABA
         function filtrarJogosNaTela(diaDesejado) {
             document.querySelectorAll('.jogo-dia').forEach(card => {
                 if (card.getAttribute('data-dia') === diaDesejado) {
@@ -401,7 +445,6 @@
                 const inputP1 = document.getElementById(`jogo_${jogo.id}_p1`);
                 const inputP2 = document.getElementById(`jogo_${jogo.id}_p2`);
 
-                // Verifica se os inputs existem e estão preenchidos antes de salvar
                 if (inputP1 && inputP2 && inputP1.value !== '' && inputP2.value !== '') {
                     listaPalpites.push({
                         usuario_id: usuarioAtual.id,
