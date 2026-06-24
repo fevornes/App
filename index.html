@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Bolão Copa 2026</title>
+    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#038C3E">
     
-    <link rel="apple-touch-icon" href="icone.svg">
+    <link class="icon-app" rel="apple-touch-icon" href="icone.svg">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="icon" type="image/svg+xml" href="icone.svg">
-    
-    <!-- Importando a biblioteca oficial do Supabase -->
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -97,17 +97,15 @@
             width: 100%;
         }
         
-        /* --- AQUI ESTÁ A MUDANÇA DE ALINHAMENTO --- */
         .time { 
             font-size: 0.9rem; 
             line-height: 1.2; 
             word-wrap: break-word; 
-            text-align: center; /* Centraliza o texto das seleções */
+            text-align: center;
             width: 100%;
         }
         .time.mandante { justify-self: center; }
         .time.visitante { justify-self: center; }
-        /* ------------------------------------------- */
         
         input[type="number"] {
             width: 100%; height: 38px; text-align: center; font-size: 1.1rem;
@@ -158,6 +156,7 @@
         .cor-box.vencedor { border-color: var(--cor-acerto-vencedor); background: #f8f9fa; }
         .cor-box.erro { border-color: var(--cor-erro); background: #fdeaea; }
 
+        /* --- POP-UPS (NOTIFICAÇÃO E TUTORIAL DE INSTALAÇÃO) --- */
         .popup-notificacao {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
@@ -166,11 +165,19 @@
         .popup-conteudo {
             background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 400px;
             text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box;
-            animation: surgirPopup 0.3s ease;
+            animation: surgirPopup 0.3s ease; position: relative;
         }
         @keyframes surgirPopup { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .popup-titulo { color: var(--primary); font-size: 1.4rem; margin-top: 0; margin-bottom: 10px; }
         .popup-texto { color: #555; font-size: 1rem; margin-bottom: 20px; line-height: 1.4; }
+
+        /* Estilos específicos para as Abas do Tutorial dentro do pop-up */
+        .tutorial-tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .t-tab-btn { flex: 1; padding: 8px; border: none; background: #eee; cursor: pointer; border-radius: 6px; font-weight: bold; color: #555; }
+        .t-tab-btn.ativo { background: var(--primary); color: white; }
+        .tutorial-passos { text-align: left; font-size: 0.9rem; color: #444; line-height: 1.5; }
+        .tutorial-passos ol { padding-left: 20px; margin: 10px 0; }
+        .tutorial-passos li { margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -223,6 +230,10 @@
         
         <h3 style="margin-top: -10px; margin-bottom: 5px; color: var(--primary); font-size: 1.3rem;">⚙️ Menu</h3>
         
+        <button class="btn-acao" style="background-color: var(--secondary); color: var(--text); padding: 10px; font-size: 0.95rem; margin-top: 0; margin-bottom: 5px;" onclick="abrirTutorialInstalacao()">📱 Instalar Aplicativo</button>
+
+        <hr class="menu-divisor">
+        
         <div class="menu-section">
             <p class="menu-section-title">👤 Alterar Perfil</p>
             <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
@@ -258,9 +269,41 @@
 
     <div class="popup-notificacao" id="popup-aviso">
         <div class="popup-conteudo">
-            <h3 class="popup-titulo">⚽ Ranking Atualizado!</h3>
+            <h3 class="popup-titulo">⚽ Ranking Updated!</h3>
             <p class="popup-texto" id="popup-texto-data">Novos resultados oficiais foram adicionados pela banca do bolão. Venha conferir como ficou a classificação geral!</p>
             <button class="btn-acao" onclick="fecharPopupAviso()">Ver Classificação</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-tutorial">
+        <div class="popup-conteudo">
+            <button onclick="fecharTutorialInstalacao()" style="position: absolute; top: 12px; right: 15px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #888;">✖</button>
+            <h3 class="popup-titulo" style="margin-bottom: 15px; font-size: 1.2rem;">Como Instalar no Celular</h3>
+            
+            <div class="tutorial-tabs">
+                <button class="t-tab-btn ativo" id="btn-tab-android" onclick="mudarAbaTutorial('android')">🤖 Android</button>
+                <button class="t-tab-btn" id="btn-tab-ios" onclick="mudarAbaTutorial('ios')">🍏 iPhone (iOS)</button>
+            </div>
+
+            <div id="passos-android" class="tutorial-passos">
+                <p>Se você usa o navegador <strong>Google Chrome</strong>:</p>
+                <ol>
+                    <li>Toque nos <strong>três pontinhos ( ⁝ )</strong> no canto superior direito da tela.</li>
+                    <li>Clique na opção <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
+                    <li>Pronto! O Polvo Paul vai aparecer junto com as suas redes sociais.</li>
+                </ol>
+            </div>
+
+            <div id="passos-ios" class="tutorial-passos" style="display: none;">
+                <p>Você precisa abrir o site pelo navegador padrão <strong>Safari</strong>:</p>
+                <ol>
+                    <li>Toque no botão de <strong>Compartilhar</strong> (o ícone de um quadrado com uma seta para cima na barra de baixo).</li>
+                    <li>Role as opções para baixo e clique em <strong>"Adicionar à Tela de Início"</strong>.</li>
+                    <li>Clique em <strong>Adicionar</strong> no canto superior direito e o ícone estará fixado no seu celular!</li>
+                </ol>
+            </div>
+            
+            <button class="btn-acao" style="margin-top: 15px; padding: 10px;" onclick="fecharTutorialInstalacao()">Entendi</button>
         </div>
     </div>
 
@@ -273,6 +316,31 @@
 
         let jogos = [];
         let usuarioAtual = null;
+
+        // --- FUNÇÕES DO NOVO POP-UP DE TUTORIAL ---
+        function abrirTutorialInstalacao() {
+            fecharMenu(); // Fecha o menu lateral
+            document.getElementById('popup-tutorial').style.display = 'flex';
+        }
+
+        function fecharTutorialInstalacao() {
+            document.getElementById('popup-tutorial').style.display = 'none';
+        }
+
+        function mudarAbaTutorial(sistema) {
+            if(sistema === 'android') {
+                document.getElementById('btn-tab-android').classList.add('ativo');
+                document.getElementById('btn-tab-ios').classList.remove('ativo');
+                document.getElementById('passos-android').style.display = 'block';
+                document.getElementById('passos-ios').style.display = 'none';
+            } else {
+                document.getElementById('btn-tab-ios').classList.add('ativo');
+                document.getElementById('btn-tab-android').classList.remove('ativo');
+                document.getElementById('passos-ios').style.display = 'block';
+                document.getElementById('passos-android').style.display = 'none';
+            }
+        }
+        // ------------------------------------------
 
         function abrirMenu() {
             document.getElementById('menu-overlay').style.display = 'block';
