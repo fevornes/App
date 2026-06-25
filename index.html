@@ -189,6 +189,28 @@
         .tutorial-passos { text-align: left; font-size: 0.9rem; color: #444; line-height: 1.5; }
         .tutorial-passos ol { padding-left: 20px; margin: 10px 0; }
         .tutorial-passos li { margin-bottom: 8px; }
+
+        .btn-limpar {
+            background: none; border: none; color: #d93025; cursor: pointer;
+            font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold;
+        }
+        .btn-limpar:hover { background: #fdeaea; }
+
+        .chart-container { width: 100%; max-width: 100%; overflow-x: auto; margin: 10px 0; }
+        .chart-container canvas { display: block; margin: 0 auto; }
+
+        .grupo-tabs { margin-top: -10px; margin-bottom: 15px; }
+
+        .live-indicator {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: #dc3545; margin-right: 4px; animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; }
+        .stat-item { background: #f8f9fa; padding: 10px; border-radius: 8px; }
+        .stat-valor { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+        .stat-label { font-size: 0.7rem; color: #888; }
     </style>
 </head>
 <body>
@@ -237,8 +259,9 @@
 
         <div id="area-jogos-wrapper">
             <div class="tabs-container" id="dias-tabs"></div>
+            <div class="tabs-container grupo-tabs" id="grupo-tabs" style="display:none;"></div>
             <div id="container-jogos"></div>
-            <button class="btn-acao desativado" id="btn-salvar" style="margin-top: 15px; margin-bottom: 15px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">Salvar Meus Palpites</button>
+            <button class="btn-acao desativado" id="btn-salvar" style="margin-top: 15px; margin-bottom: 15px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">SALVAR MEUS PALPITES</button>
             <div style="width:100%;text-align:center;font-size:0.7rem;color:#000;margin-bottom:40px;font-style:italic;font-family:'Georgia','Times New Roman',serif;">fevornes</div>
         </div>
     </div>
@@ -257,6 +280,13 @@
             <p class="menu-section-title">👤 Alterar Perfil</p>
             <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
             <button class="btn-acao" style="padding: 10px; font-size: 0.9rem; margin-top: 0;" onclick="salvarNovoNome()">Atualizar Nome</button>
+        </div>
+
+        <hr class="menu-divisor">
+
+        <div class="menu-section" style="flex-direction:row;gap:8px;">
+            <button class="btn-acao" style="padding:10px;font-size:0.85rem;margin:0;flex:1;" onclick="abrirPopupEstatisticas()">📊 Minhas Stats</button>
+            <button class="btn-acao" style="padding:10px;font-size:0.85rem;margin:0;flex:1;background:var(--secondary);color:var(--text);" onclick="abrirPopupGrafico()">📈 Evolução</button>
         </div>
 
         <hr class="menu-divisor">
@@ -352,15 +382,20 @@
         let jogos = [];
         let usuarioAtual = null;
         let valoresOriginais = {};
+        let jogosFinalizados = new Set();
+        let jogosFinalizadosInicializado = false;
 
         function jogoJaComecou(dataStr) {
+            return new Date() >= getDataJogo(dataStr);
+        }
+
+        function getDataJogo(dataStr) {
             const partes = dataStr.split(' - ');
             const dataParts = partes[0].split('/');
             const dia = parseInt(dataParts[0]);
             const mes = parseInt(dataParts[1]) - 1;
             const hora = partes[1] || '00:00';
-            const jogoDate = new Date(2026, mes, dia, ...hora.split(':'));
-            return new Date() >= jogoDate;
+            return new Date(2026, mes, dia, ...hora.split(':'));
         }
 
         function abrirTutorialInstalacao() {
@@ -544,8 +579,8 @@
                 if (!todosJogos) { console.warn('[AutoSync] Nenhum jogo no banco'); return; }
 
                 let atualizados = 0;
+                jogosFinalizados = new Set();
                 for (const match of matches) {
-                    if (match.finished !== 'TRUE') continue;
                     const partesData = match.local_date.split(' ');
                     const dParts = partesData[0].split('/');
                     const hParts = partesData[1] ? partesData[1].split(':') : ['0','0'];
@@ -561,6 +596,7 @@
                         (j.time1 === timeFora && j.time2 === timeCasa)
                     );
                     if (!jogoBD) { console.log('[AutoSync] Jogo não encontrado no BD:', timeCasa, 'x', timeFora); continue; }
+                    if (match.finished === 'TRUE') jogosFinalizados.add(jogoBD.id);
                     const res1 = jogoBD.time1 === timeCasa ? gc : gf;
                     const res2 = jogoBD.time1 === timeCasa ? gf : gc;
                     if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
@@ -568,6 +604,7 @@
                         atualizados++;
                     }
                 }
+                jogosFinalizadosInicializado = true;
                 if (atualizados > 0) console.log('[AutoSync] Atualizados:', atualizados);
                 await carregarJogosEJogadores();
             } catch (e) { console.error('[AutoSync] Erro:', e); }
@@ -619,17 +656,62 @@
 
                 const tabsContainer = document.getElementById('dias-tabs');
                 tabsContainer.innerHTML = '';
-                
+
+                // Botão toggle "Grupos"
+                const btnGruposToggle = document.createElement('button');
+                btnGruposToggle.className = 'tab-btn';
+                btnGruposToggle.innerText = '📋 Grupos';
+                btnGruposToggle.onclick = () => {
+                    document.getElementById('dias-tabs').style.display = 'none';
+                    document.getElementById('grupo-tabs').style.display = 'flex';
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
+                    btnGruposToggle.classList.add('ativo');
+                    document.querySelectorAll('.grupo-btn').forEach(b => b.classList.remove('ativo'));
+                    const primeiroGrupo = document.querySelector('.grupo-btn');
+                    if (primeiroGrupo) primeiroGrupo.click();
+                    else document.querySelectorAll('.jogo-dia').forEach(c => c.style.display = 'flex');
+                };
+                tabsContainer.appendChild(btnGruposToggle);
+
                 diasUnicos.forEach(dia => {
                     const btn = document.createElement('button');
                     btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
                     btn.innerText = `Dia ${dia}`;
                     btn.onclick = () => {
                         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
+                        document.querySelectorAll('.grupo-btn').forEach(b => b.classList.remove('ativo'));
+                        document.getElementById('grupo-tabs').style.display = 'none';
+                        document.getElementById('dias-tabs').style.display = 'flex';
                         btn.classList.add('ativo');
                         filtrarJogosNaTela(dia);
+                        abaAtiva = 'dia';
                     };
                     tabsContainer.appendChild(btn);
+                });
+
+                // Abas de grupos
+                const gruposUnicos = [...new Set(jogos.map(j => j.grupo))];
+                const gruposContainer = document.getElementById('grupo-tabs');
+                gruposContainer.innerHTML = '';
+                const btnVoltarDia = document.createElement('button');
+                btnVoltarDia.className = 'tab-btn';
+                btnVoltarDia.innerText = '⬅ Dias';
+                btnVoltarDia.onclick = () => {
+                    document.getElementById('grupo-tabs').style.display = 'none';
+                    document.getElementById('dias-tabs').style.display = 'flex';
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
+                    document.querySelectorAll('.grupo-btn').forEach(b => b.classList.remove('ativo'));
+                    const diaAtivoBtn = document.querySelector('#dias-tabs .tab-btn:not(:first-child)');
+                    if (diaAtivoBtn) diaAtivoBtn.click();
+                };
+                gruposContainer.appendChild(btnVoltarDia);
+                gruposUnicos.forEach(grupo => {
+                    const btn = document.createElement('button');
+                    btn.className = 'tab-btn grupo-btn';
+                    btn.id = `grupo-btn-${grupo}`;
+                    btn.innerText = grupo;
+                    btn.onclick = () => alternarAbaGrupo(grupo);
+                    gruposContainer.appendChild(btn);
                 });
 
                 jogos.forEach(jogo => {
@@ -656,10 +738,27 @@
                     const diaDoJogo = jogo.data.split(' - ')[0];
                     const encerrado = jogoJaComecou(jogo.data);
                     const disabledAttr = encerrado ? 'disabled' : '';
-                    const labelEncerrado = encerrado ? '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Palpite encerrado</div>' : '';
+                    const temResultado = jogo.res1 !== null && jogo.res2 !== null;
+                    const temPalpite = p1Value !== '' && p2Value !== '';
+                    const ehFinalizado = !jogosFinalizadosInicializado || jogosFinalizados.has(jogo.id);
+                    const ehAoVivo = temResultado && encerrado && !ehFinalizado;
+                    const liveClass = ehAoVivo ? 'jogo-ao-vivo' : '';
+
+                    let labelEncerrado = '';
+                    if (ehAoVivo) {
+                        labelEncerrado = '<div style="font-size:0.75rem;color:#dc3545;text-align:center;margin-top:5px;"><span class="live-indicator"></span>AO VIVO</div>';
+                    } else if (encerrado && temResultado) {
+                        labelEncerrado = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Encerrado</div>';
+                    } else if (encerrado && !temResultado) {
+                        labelEncerrado = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Palpite encerrado</div>';
+                    }
+
+                    const btnLimpar = !encerrado && temPalpite
+                        ? `<button class="btn-limpar" onclick="limparPalpite(${jogo.id})" title="Limpar palpite">✕ Limpar</button>`
+                        : '';
 
                     const card = `
-                        <div class="jogo-card jogo-dia ${classeResultado}" data-dia="${diaDoJogo}">
+                        <div class="jogo-card jogo-dia ${classeResultado} ${liveClass}" data-dia="${diaDoJogo}" data-grupo="${jogo.grupo}">
                             <div class="info-jogo">${statusJogo}</div>
                             <div class="placar-container">
                                 <div class="time mandante">${jogo.time1}</div>
@@ -668,7 +767,10 @@
                                 <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}" ${disabledAttr}>
                                 <div class="time visitante">${jogo.time2}</div>
                             </div>
-                            ${labelEncerrado}
+                            <div style="display:flex;justify-content:space-between;align-items:center;min-height:20px;">
+                                <div>${btnLimpar}</div>
+                                ${labelEncerrado}
+                            </div>
                         </div>
                     `;
                     container.innerHTML += card;
@@ -693,6 +795,7 @@
         }
 
         function filtrarJogosNaTela(diaDesejado) {
+            if (document.getElementById('grupo-tabs').style.display === 'flex') return;
             document.querySelectorAll('.jogo-dia').forEach(card => {
                 card.style.display = (card.getAttribute('data-dia') === diaDesejado) ? 'flex' : 'none';
             });
@@ -1094,14 +1197,13 @@
 
                 const data = await resp.json();
                 const matches = data.games || [];
-
                 const { data: todosJogos } = await banco.from('jogos').select('*');
                 let atualizados = 0, ignorados = 0;
+                jogosFinalizados = new Set();
 
                 for (const match of matches) {
-                    if (match.finished !== 'TRUE') continue;
-
                     const partesData = match.local_date.split(' ');
+
                     const dParts = partesData[0].split('/');
                     const hParts = partesData[1] ? partesData[1].split(':') : ['0','0'];
                     const dataJogo = new Date(parseInt(dParts[2]), parseInt(dParts[0])-1, parseInt(dParts[1]), parseInt(hParts[0]), parseInt(hParts[1]));
@@ -1119,6 +1221,8 @@
                         (j.time1 === timeFora && j.time2 === timeCasa)
                     );
                     if (!jogoBD) { ignorados++; continue; }
+
+                    if (match.finished === 'TRUE') jogosFinalizados.add(jogoBD.id);
 
                     const res1 = jogoBD.time1 === timeCasa ? gc : gf;
                     const res2 = jogoBD.time1 === timeCasa ? gf : gc;
@@ -1138,6 +1242,7 @@
                     }
                 }
 
+                jogosFinalizadosInicializado = true;
                 status.innerText = `✅ ${atualizados} atualizado(s), ${ignorados} ignorado(s).`;
                 await carregarJogosEJogadores();
             } catch (e) {
@@ -1161,6 +1266,189 @@
             await carregarJogosEJogadores();
             renderizarListaJogosAdmin();
         }
+        // --- Limpar palpite individual ---
+        async function limparPalpite(jogoId) {
+            if (!confirm("Limpar este palpite?")) return;
+            const input1 = document.getElementById(`jogo_${jogoId}_p1`);
+            const input2 = document.getElementById(`jogo_${jogoId}_p2`);
+            if (input1) input1.value = '';
+            if (input2) input2.value = '';
+            await banco.from('palpites').delete().eq('usuario_id', usuarioAtual.id).eq('jogo_id', jogoId);
+            await carregarJogosEJogadores();
+        }
+
+        // --- Estatísticas do perfil ---
+        function calcularEstatisticas() {
+            let totalCravadas = 0, totalAcertos = 0, totalErros = 0, totalPontos = 0, totalJogos = 0;
+            jogos.forEach(jogo => {
+                if (jogo.res1 === null || jogo.res2 === null) return;
+                const palpite = palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id);
+                if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
+                totalJogos++;
+                const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                const r1 = jogo.res1, r2 = jogo.res2;
+                if (p1 === r1 && p2 === r2) { totalCravadas++; totalPontos += 5; }
+                else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { totalAcertos++; totalPontos += 3; }
+                else { totalErros++; }
+            });
+            const aproveitamento = totalJogos > 0 ? ((totalPontos / (totalJogos * 5)) * 100).toFixed(1) : '0';
+            return { totalCravadas, totalAcertos, totalErros, totalPontos, totalJogos, aproveitamento };
+        }
+
+        function abrirPopupEstatisticas() {
+            const stats = calcularEstatisticas();
+            document.getElementById('stats-cravadas').innerText = stats.totalCravadas;
+            document.getElementById('stats-acertos').innerText = stats.totalAcertos;
+            document.getElementById('stats-erros').innerText = stats.totalErros;
+            document.getElementById('stats-pontos').innerText = stats.totalPontos;
+            document.getElementById('stats-jogos').innerText = stats.totalJogos;
+            document.getElementById('stats-aproveitamento').innerText = stats.aproveitamento + '%';
+            document.getElementById('popup-estatisticas').style.display = 'flex';
+        }
+        function fecharPopupEstatisticas() { document.getElementById('popup-estatisticas').style.display = 'none'; }
+
+        // --- Gráfico de evolução ---
+        function abrirPopupGrafico() {
+            document.getElementById('popup-grafico').style.display = 'flex';
+            setTimeout(renderizarGrafico, 200);
+        }
+        function fecharPopupGrafico() { document.getElementById('popup-grafico').style.display = 'none'; }
+
+        function renderizarGrafico() {
+            const canvas = document.getElementById('canvas-evolucao');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const w = Math.min(rect.width - 20, 460);
+            canvas.style.width = w + 'px';
+            canvas.style.height = '200px';
+            canvas.width = w * dpr;
+            canvas.height = 200 * dpr;
+            ctx.scale(dpr, dpr);
+
+            const dias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
+            dias.sort((a, b) => {
+                const [dA, mA] = a.split('/').map(Number);
+                const [dB, mB] = b.split('/').map(Number);
+                return mA - mB || dA - dB;
+            });
+
+            let cumulativo = 0;
+            const pontosPorDia = [];
+            for (const dia of dias) {
+                const jogosDoDia = jogos.filter(j => j.data.startsWith(dia));
+                let pontosDia = 0;
+                jogosDoDia.forEach(jogo => {
+                    if (jogo.res1 === null || jogo.res2 === null) return;
+                    const palpite = palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id);
+                    if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
+                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                    const r1 = jogo.res1, r2 = jogo.res2;
+                    if (p1 === r1 && p2 === r2) pontosDia += 5;
+                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontosDia += 3;
+                });
+                cumulativo += pontosDia;
+                pontosPorDia.push({ dia, pontosDia, cumulativo });
+            }
+
+            if (pontosPorDia.length === 0) {
+                ctx.font = '14px sans-serif';
+                ctx.fillStyle = '#888';
+                ctx.textAlign = 'center';
+                ctx.fillText('Nenhum resultado ainda', w/2, 100);
+                return;
+            }
+
+            const pad = { top: 20, right: 10, bottom: 30, left: 40 };
+            const cw = w - pad.left - pad.right;
+            const ch = 200 - pad.top - pad.bottom;
+            const maxPts = Math.max(...pontosPorDia.map(p => p.cumulativo), 5);
+
+            // Grid
+            ctx.strokeStyle = '#eee';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = pad.top + (ch / 4) * i;
+                ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+                ctx.fillStyle = '#999';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(maxPts - (maxPts / 4) * i), pad.left - 5, y + 3);
+            }
+
+            // Linha
+            ctx.beginPath();
+            ctx.strokeStyle = '#038C3E';
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            pontosPorDia.forEach((p, i) => {
+                const x = pad.left + (cw / (pontosPorDia.length - 1 || 1)) * i;
+                const y = pad.top + ch - (p.cumulativo / maxPts) * ch;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Pontos
+            ctx.fillStyle = '#038C3E';
+            pontosPorDia.forEach((p, i) => {
+                const x = pad.left + (cw / (pontosPorDia.length - 1 || 1)) * i;
+                const y = pad.top + ch - (p.cumulativo / maxPts) * ch;
+                ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+            });
+
+            // Labels
+            ctx.fillStyle = '#666';
+            ctx.font = '9px sans-serif';
+            ctx.textAlign = 'center';
+            pontosPorDia.forEach((p, i) => {
+                const x = pad.left + (cw / (pontosPorDia.length - 1 || 1)) * i;
+                ctx.fillText(p.dia, x, 200 - 8);
+            });
+
+            // Preenchimento gradiente
+            const grad = ctx.createLinearGradient(0, pad.top, 0, 200 - pad.bottom);
+            grad.addColorStop(0, 'rgba(3,140,62,0.2)');
+            grad.addColorStop(1, 'rgba(3,140,62,0.01)');
+            ctx.beginPath();
+            pontosPorDia.forEach((p, i) => {
+                const x = pad.left + (cw / (pontosPorDia.length - 1 || 1)) * i;
+                const y = pad.top + ch - (p.cumulativo / maxPts) * ch;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            const lastX = pad.left + cw;
+            ctx.lineTo(lastX, pad.top + ch);
+            ctx.lineTo(pad.left, pad.top + ch);
+            ctx.closePath();
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+
+        // --- Aba de grupos ---
+        let abaAtiva = 'dia';
+
+        function alternarAbaGrupo(grupo) {
+            abaAtiva = 'grupo';
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
+            document.querySelectorAll('.grupo-btn').forEach(b => b.classList.remove('ativo'));
+            const btnGrupo = document.getElementById(`grupo-btn-${grupo}`);
+            if (btnGrupo) btnGrupo.classList.add('ativo');
+            document.querySelectorAll('.jogo-dia').forEach(card => {
+                card.style.display = card.getAttribute('data-grupo') === grupo ? 'flex' : 'none';
+            });
+        }
+
+        function voltarAbaDia() {
+            abaAtiva = 'dia';
+            document.querySelectorAll('.grupo-btn').forEach(b => b.classList.remove('ativo'));
+            const diaAtivo = document.querySelector('.tab-btn.ativo');
+            if (diaAtivo) diaAtivo.click();
+            else {
+                const primeiro = document.querySelector('.tab-btn');
+                if (primeiro) primeiro.click();
+            }
+        }
+
         let palpitesUsuarioAlvo = [];
         let nomeUsuarioAlvo = '';
 
@@ -1244,6 +1532,32 @@
             </div>
             <div id="lista-usuario" style="text-align:left;max-height:350px;overflow-y:auto;padding-right:5px;font-size:0.85rem;"></div>
             <button class="btn-acao" style="margin-top:15px;background:#666;" onclick="fecharPopupUsuario()">Fechar</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-estatisticas">
+        <div class="popup-conteudo" style="max-width: 400px;">
+            <button onclick="fecharPopupEstatisticas()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">📊 Minhas Estatísticas</h3>
+            <div class="stat-grid">
+                <div class="stat-item"><div class="stat-valor" id="stats-pontos">0</div><div class="stat-label">Total Pontos</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-aproveitamento">0%</div><div class="stat-label">Aproveitamento</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-jogos">0</div><div class="stat-label">Jogos com resultado</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-cravadas">0</div><div class="stat-label">🎯 Cravadas (5pts)</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-acertos">0</div><div class="stat-label">✅ Acertos (3pts)</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-erros">0</div><div class="stat-label">❌ Erros (0pts)</div></div>
+            </div>
+            <button class="btn-acao" style="margin-top:15px;background:#666;" onclick="fecharPopupEstatisticas()">Fechar</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-grafico">
+        <div class="popup-conteudo" style="max-width: 500px;">
+            <button onclick="fecharPopupGrafico()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">📈 Evolução dos Pontos</h3>
+            <p style="font-size:0.8rem;color:#888;margin:-5px 0 10px;">Pontos acumulados por dia de jogo</p>
+            <div class="chart-container"><canvas id="canvas-evolucao"></canvas></div>
+            <button class="btn-acao" style="margin-top:10px;background:#666;" onclick="fecharPopupGrafico()">Fechar</button>
         </div>
     </div>
 
