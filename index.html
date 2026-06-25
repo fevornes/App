@@ -482,6 +482,7 @@
 
         async function deslogar() {
             fecharMenu();
+            if (intervaloAuto) clearInterval(intervaloAuto);
             await banco.auth.signOut();
             usuarioAtual = null;
             document.getElementById('login-password').value = '';
@@ -493,6 +494,8 @@
             document.getElementById('jogo-secao').style.display = 'none';
             document.getElementById('login-secao').style.display = 'block';
         }
+
+        let intervaloAuto = null;
 
         async function mostrarPainelJogo() {
             document.getElementById('login-secao').style.display = 'none';
@@ -511,6 +514,46 @@
                     document.getElementById('popup-aviso').style.display = 'flex';
                 })
                 .subscribe();
+
+            // Sincronizar resultados automaticamente a cada 5 minutos
+            if (intervaloAuto) clearInterval(intervaloAuto);
+            intervaloAuto = setInterval(sincronizarAuto, 300000);
+        }
+
+        async function sincronizarAuto() {
+            try {
+                const resp = await fetch('https://worldcup26.ir/get/games');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const matches = data.games || [];
+                const { data: todosJogos } = await banco.from('jogos').select('*');
+                if (!todosJogos) return;
+
+                for (const match of matches) {
+                    if (match.finished !== 'TRUE') continue;
+                    const partesData = match.local_date.split(' ');
+                    const dParts = partesData[0].split('/');
+                    const hParts = partesData[1] ? partesData[1].split(':') : ['0','0'];
+                    const dataJogo = new Date(parseInt(dParts[2]), parseInt(dParts[0])-1, parseInt(dParts[1]), parseInt(hParts[0]), parseInt(hParts[1]));
+                    if (dataJogo > new Date()) continue;
+                    const gc = parseInt(match.home_score);
+                    const gf = parseInt(match.away_score);
+                    if (isNaN(gc) || isNaN(gf)) continue;
+                    const timeCasa = en2pt[match.home_team_name_en] || match.home_team_name_en;
+                    const timeFora = en2pt[match.away_team_name_en] || match.away_team_name_en;
+                    const jogoBD = todosJogos.find(j =>
+                        (j.time1 === timeCasa && j.time2 === timeFora) ||
+                        (j.time1 === timeFora && j.time2 === timeCasa)
+                    );
+                    if (!jogoBD) continue;
+                    const res1 = jogoBD.time1 === timeCasa ? gc : gf;
+                    const res2 = jogoBD.time1 === timeCasa ? gf : gc;
+                    if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+                        await banco.from('jogos').update({ res1, res2 }).eq('id', jogoBD.id);
+                    }
+                }
+                await carregarJogosEJogadores();
+            } catch (_) {}
         }
 
         async function carregarJogosEJogadores() {
@@ -524,6 +567,14 @@
                 
                 jogos = jogosDoBanco;
 
+                // Limpar resultados de jogos que ainda não começaram
+                for (const j of jogos) {
+                    if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
+                        await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
+                        j.res1 = null; j.res2 = null;
+                    }
+                }
+
                 const { data: palpitesSalvos } = await banco
                     .from('palpites')
                     .select('*')
@@ -533,7 +584,21 @@
                 container.innerHTML = '';
 
                 const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
-                let diaAtivo = diasUnicos.length > 0 ? diasUnicos[0] : '';
+                const hoje = new Date();
+                const hojeDDMM = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`;
+                let diaAtivo = diasUnicos.find(d => d === hojeDDMM);
+                if (!diaAtivo) {
+                    // Se não tem jogo hoje, pega o primeiro dia futuro mais próximo
+                    const hojeNum = hoje.getFullYear() * 10000 + (hoje.getMonth()+1) * 100 + hoje.getDate();
+                    let maisProximo = null, menorDiff = Infinity;
+                    for (const d of diasUnicos) {
+                        const p = d.split('/');
+                        const dNum = 2026 * 10000 + parseInt(p[1]) * 100 + parseInt(p[0]);
+                        const diff = dNum - hojeNum;
+                        if (diff >= 0 && diff < menorDiff) { menorDiff = diff; maisProximo = d; }
+                    }
+                    diaAtivo = maisProximo || diasUnicos[0];
+                }
 
                 const tabsContainer = document.getElementById('dias-tabs');
                 tabsContainer.innerHTML = '';
@@ -922,6 +987,14 @@ function alternarRanking() {
 
                 for (const match of matches) {
                     if (match.finished !== 'TRUE') continue;
+
+                    // Pular jogos que ainda não aconteceram (data futura)
+                    const partesData = match.local_date.split(' ');
+                    const dParts = partesData[0].split('/');
+                    const hParts = partesData[1] ? partesData[1].split(':') : ['0','0'];
+                    const dataJogo = new Date(parseInt(dParts[2]), parseInt(dParts[0])-1, parseInt(dParts[1]), parseInt(hParts[0]), parseInt(hParts[1]));
+                    if (dataJogo > new Date()) continue;
+
                     const gc = parseInt(match.home_score);
                     const gf = parseInt(match.away_score);
                     if (isNaN(gc) || isNaN(gf)) continue;
@@ -941,6 +1014,16 @@ function alternarRanking() {
                     if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
                         await banco.from('jogos').update({ res1, res2 }).eq('id', jogoBD.id);
                         atualizados++;
+                    }
+                }
+
+                // Limpar resultados de jogos que ainda não aconteceram
+                const { data: todosApos } = await banco.from('jogos').select('*');
+                if (todosApos) {
+                    for (const j of todosApos) {
+                        if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
+                            await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
+                        }
                     }
                 }
 
