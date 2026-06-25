@@ -14,6 +14,7 @@
     <link rel="icon" type="image/svg+xml" href="icone.svg">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1"></script>
     <style>
         :root {
             --primary: #038C3E;
@@ -227,7 +228,10 @@
         </div>
 
         <div class="ranking-container">
-            <h3 class="ranking-titulo">📊 Classificação Geral</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--secondary);padding-bottom:5px;margin-bottom:15px;">
+                <h3 class="ranking-titulo" style="margin:0;border:none;padding:0;">📊 Classificação Geral</h3>
+                <button onclick="compartilharRanking()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;padding:0;line-height:1;" title="Compartilhar classificação">📤</button>
+            </div>
             <div id="tabela-ranking">Carregando classificação...</div>
         </div>
 
@@ -844,10 +848,51 @@
             palpitesSalvosFiltro = data || [];
         }
 
-function alternarRanking() {
+        function alternarRanking() {
             const div = document.getElementById('tabela-ranking');
             div.dataset.expandido = div.dataset.expandido === 'true' ? 'false' : 'true';
             calcularEAtualizarRankingGeral();
+        }
+
+        async function compartilharRanking() {
+            const div = document.getElementById('tabela-ranking');
+            div.dataset.expandido = 'true';
+            await calcularEAtualizarRankingGeral();
+            await new Promise(r => setTimeout(r, 200));
+
+            const container = div.parentElement;
+            const original = container.style.borderRadius;
+            container.style.borderRadius = '12px';
+            container.style.overflow = 'hidden';
+
+            try {
+                const canvas = await html2canvas(container, {
+                    backgroundColor: '#ffffff', scale: 2, useCORS: true,
+                    logging: false, width: container.scrollWidth, height: container.scrollHeight
+                });
+                container.style.borderRadius = original;
+                container.style.overflow = '';
+
+                canvas.toBlob(blob => {
+                    if (!blob) return alert("Erro ao gerar imagem.");
+                    if (navigator.share && navigator.canShare({ files: [new File([blob], 'ranking.png', { type: 'image/png' })] })) {
+                        navigator.share({ files: [new File([blob], 'ranking.png', { type: 'image/png' })], title: 'Classificação Geral' });
+                    } else {
+                        const link = document.createElement('a');
+                        link.download = 'classificacao_bolao.png';
+                        link.href = URL.createObjectURL(blob);
+                        link.click();
+                        URL.revokeObjectURL(link.href);
+                    }
+                });
+            } catch (e) {
+                container.style.borderRadius = original;
+                container.style.overflow = '';
+                alert("Erro ao gerar imagem: " + e.message);
+            } finally {
+                div.dataset.expandido = 'false';
+                await calcularEAtualizarRankingGeral();
+            }
         }
 
         verificarSessao();
