@@ -134,6 +134,8 @@
         .link-alternar { text-align: center; font-size: 0.9rem; color: #666; margin-top: 10px; }
         .link-alternar a { color: var(--primary); font-weight: bold; text-decoration: none; }
 
+
+
         .btn-header-menu { background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text); padding: 0; }
         .menu-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 998; }
         
@@ -502,6 +504,13 @@
 
             await carregarJogosEJogadores();
             await carregarPalpitesFiltro();
+
+            banco.channel('notificacoes')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacoes' }, (payload) => {
+                    document.getElementById('popup-texto-data').innerText = payload.new.mensagem;
+                    document.getElementById('popup-aviso').style.display = 'flex';
+                })
+                .subscribe();
         }
 
         async function carregarJogosEJogadores() {
@@ -770,7 +779,7 @@
             palpitesSalvosFiltro = data || [];
         }
 
-        function alternarRanking() {
+function alternarRanking() {
             const div = document.getElementById('tabela-ranking');
             div.dataset.expandido = div.dataset.expandido === 'true' ? 'false' : 'true';
             calcularEAtualizarRankingGeral();
@@ -788,35 +797,175 @@
             }
 
             document.getElementById('popup-admin').style.display = 'flex';
+            renderizarListaJogosAdmin();
+        }
+
+        function renderizarListaJogosAdmin() {
             const container = document.getElementById('lista-jogos-admin');
             container.innerHTML = '';
-            
+
             jogos.forEach(jogo => {
                 container.innerHTML += `
-                    <div style="margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:10px; display: flex; align-items: center; gap: 10px;">
-                        <span style="flex-grow: 1; font-size: 0.9rem;">${jogo.time1} x ${jogo.time2}</span>
-                        <input type="number" id="adm_r1_${jogo.id}" value="${jogo.res1 !== null ? jogo.res1 : ''}" style="width:40px; padding: 5px;">
-                        <span>x</span>
-                        <input type="number" id="adm_r2_${jogo.id}" value="${jogo.res2 !== null ? jogo.res2 : ''}" style="width:40px; padding: 5px;">
-                        <button onclick="salvarResultadoAdmin(${jogo.id})" style="padding: 5px 10px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">Salvar</button>
+                    <div style="margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:8px;">
+                        <div style="font-size:0.75rem;color:#888;margin-bottom:2px;">${jogo.grupo} • ${jogo.data}</div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="flex:1;font-size:0.85rem;min-width:0;">${jogo.time1} x ${jogo.time2}</span>
+                            <input type="number" id="adm_r1_${jogo.id}" value="${jogo.res1 !== null ? jogo.res1 : ''}" style="width:38px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;">
+                            <span style="font-size:0.8rem;">x</span>
+                            <input type="number" id="adm_r2_${jogo.id}" value="${jogo.res2 !== null ? jogo.res2 : ''}" style="width:38px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;">
+                            <button onclick="salvarResultadoAdmin(${jogo.id})" style="padding:4px 8px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;">Salvar</button>
+                            <button onclick="excluirJogoAdmin(${jogo.id})" style="padding:4px 8px;background:#d93025;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;">×</button>
+                        </div>
                     </div>
                 `;
             });
+
+            if (jogos.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:#888;font-size:0.85rem;">Nenhum jogo cadastrado.</div>';
+            }
         }
 
         async function salvarResultadoAdmin(id) {
             const r1 = document.getElementById('adm_r1_'+id).value;
             const r2 = document.getElementById('adm_r2_'+id).value;
-            
-            const { error } = await banco.from('jogos').update({ res1: parseInt(r1), res2: parseInt(r2) }).eq('id', id);
-            
-            if(error) {
-                alert("Erro ao salvar: " + error.message);
-            } else {
-                alert("Resultado salvo! O ranking será atualizado.");
-                fecharAdmin();
-                await carregarJogosEJogadores();
+
+            const sess = await banco.auth.getSession();
+            const token = sess.data.session?.access_token;
+            if (!token) return alert("Sessão expirada. Refaça o login.");
+
+            // Teste: GET para ver se o token funciona
+            const getTest = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
+                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` }
+            });
+            console.log('GET Status:', getTest.status, 'GET Body:', await getTest.text());
+
+            // Teste: PATCH normal
+            const resp = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ res1: parseInt(r1), res2: parseInt(r2) })
+            });
+            const respText = await resp.text();
+            console.log('PATCH Status:', resp.status, 'Resposta:', respText);
+
+            if (!resp.ok) {
+                let err;
+                try { err = JSON.parse(respText); } catch { err = { message: respText }; }
+                alert("Erro " + resp.status + ": " + (err.message || err) + (err.code ? " (Código: " + err.code + ")" : ""));
+                return;
             }
+
+            alert("Resultado salvo!");
+            fecharAdmin();
+            await carregarJogosEJogadores();
+        }
+
+        async function adicionarJogoAdmin() {
+            const grupo = document.getElementById('adm-novo-grupo').value;
+            const data = document.getElementById('adm-novo-data').value.trim();
+            const time1 = document.getElementById('adm-novo-time1').value.trim();
+            const time2 = document.getElementById('adm-novo-time2').value.trim();
+
+            if (!grupo || !data || !time1 || !time2) return alert("Preencha todos os campos!");
+
+            const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
+            const novoId = (maxId && maxId.length > 0 ? maxId[0].id : 0) + 1;
+
+            const { error } = await banco.from('jogos').insert({
+                id: novoId, grupo, data, time1, time2, res1: null, res2: null
+            });
+
+            if (error) return alert("Erro ao adicionar: " + error.message);
+
+            document.getElementById('adm-novo-grupo').value = '';
+            document.getElementById('adm-novo-data').value = '';
+            document.getElementById('adm-novo-time1').value = '';
+            document.getElementById('adm-novo-time2').value = '';
+            await carregarJogosEJogadores();
+            renderizarListaJogosAdmin();
+            alert("Jogo adicionado!");
+        }
+
+        async function sincronizarAPI() {
+            const status = document.getElementById('status-sync');
+            status.innerText = '🔄 Buscando partidas...';
+
+            try {
+                const resp = await fetch('https://worldcup26.ir/get/games');
+                if (!resp.ok) throw new Error('Erro HTTP ' + resp.status);
+
+                const data = await resp.json();
+                const matches = data.games || [];
+
+                const { data: todosJogos } = await banco.from('jogos').select('*');
+                let atualizados = 0, ignorados = 0;
+
+                const en2pt = {
+                    'Algeria': 'Argélia', 'Argentina': 'Argentina', 'Australia': 'Austrália',
+                    'Austria': 'Áustria', 'Belgium': 'Bélgica', 'Bosnia and Herzegovina': 'Bósnia e Herzegovina',
+                    'Brazil': 'Brasil', 'Canada': 'Canadá', 'Cape Verde': 'Cabo Verde',
+                    'Colombia': 'Colômbia', 'Croatia': 'Croácia', 'Curaçao': 'Curaçao',
+                    'Czech Republic': 'Tchéquia', 'Democratic Republic of the Congo': 'RD Congo',
+                    'Ecuador': 'Equador', 'Egypt': 'Egito', 'England': 'Inglaterra',
+                    'France': 'França', 'Germany': 'Alemanha', 'Ghana': 'Gana',
+                    'Haiti': 'Haiti', 'Iran': 'Irã', 'Iraq': 'Iraque',
+                    'Ivory Coast': 'Costa do Marfim', 'Japan': 'Japão', 'Jordan': 'Jordânia',
+                    'Mexico': 'México', 'Morocco': 'Marrocos', 'Netherlands': 'Países Baixos',
+                    'New Zealand': 'Nova Zelândia', 'Norway': 'Noruega', 'Panama': 'Panamá',
+                    'Paraguay': 'Paraguai', 'Portugal': 'Portugal', 'Qatar': 'Catar',
+                    'Saudi Arabia': 'Arábia Saudita', 'Scotland': 'Escócia', 'Senegal': 'Senegal',
+                    'South Africa': 'África do Sul', 'South Korea': 'Coreia do Sul',
+                    'Spain': 'Espanha', 'Sweden': 'Suécia', 'Switzerland': 'Suíça',
+                    'Tunisia': 'Tunísia', 'Turkey': 'Turquia', 'United States': 'Estados Unidos',
+                    'Uruguay': 'Uruguai', 'Uzbekistan': 'Uzbequistão'
+                };
+
+                for (const match of matches) {
+                    if (match.finished !== 'TRUE') continue;
+                    const gc = parseInt(match.home_score);
+                    const gf = parseInt(match.away_score);
+                    if (isNaN(gc) || isNaN(gf)) continue;
+
+                    const timeCasa = en2pt[match.home_team_name_en] || match.home_team_name_en;
+                    const timeFora = en2pt[match.away_team_name_en] || match.away_team_name_en;
+
+                    const jogoBD = todosJogos.find(j =>
+                        (j.time1 === timeCasa && j.time2 === timeFora) ||
+                        (j.time1 === timeFora && j.time2 === timeCasa)
+                    );
+                    if (!jogoBD) { ignorados++; continue; }
+
+                    const res1 = jogoBD.time1 === timeCasa ? gc : gf;
+                    const res2 = jogoBD.time1 === timeCasa ? gf : gc;
+
+                    if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+                        await banco.from('jogos').update({ res1, res2 }).eq('id', jogoBD.id);
+                        atualizados++;
+                    }
+                }
+
+                status.innerText = `✅ ${atualizados} atualizado(s), ${ignorados} ignorado(s).`;
+                await carregarJogosEJogadores();
+            } catch (e) {
+                status.innerText = '❌ Erro: ' + e.message;
+            }
+        }
+
+        async function notificarTodos() {
+            if (!confirm("Enviar notificação para todos os usuários?")) return;
+            const { error } = await banco.from('notificacoes').insert({ mensagem: 'Novos resultados oficiais foram adicionados pela banca do bolão! Venha conferir a classificação.' });
+            if (error) return alert("Erro: " + error.message);
+            alert("Notificação enviada!");
+        }
+
+        async function excluirJogoAdmin(id) {
+            if (!confirm("Tem certeza que deseja excluir este jogo?")) return;
+
+            const { error } = await banco.from('jogos').delete().eq('id', id);
+            if (error) return alert("Erro ao excluir: " + error.message);
+
+            await carregarJogosEJogadores();
+            renderizarListaJogosAdmin();
         }
     </script>
 
@@ -836,9 +985,46 @@
 
     <div class="popup-notificacao" id="popup-admin" style="display: none;">
         <div class="popup-conteudo" style="max-width: 500px;">
+            <button onclick="fecharAdmin()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
             <h3 class="popup-titulo">⚙️ Painel de Adm</h3>
-            <p style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">Atualize os resultados oficiais aqui:</p>
-            <div id="lista-jogos-admin" style="text-align: left; max-height: 350px; overflow-y: auto; padding-right: 10px;"></div>
+
+            <div style="margin-bottom:15px;padding:12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;">
+                <p style="font-weight:bold;font-size:0.85rem;margin:0 0 8px;color:var(--primary);">➕ Novo Jogo</p>
+                <select id="adm-novo-grupo" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;font-size:0.85rem;">
+                    <option value="">Selecione...</option>
+                    <optgroup label="Fase de Grupos">
+                        <option>Grupo A</option><option>Grupo B</option><option>Grupo C</option><option>Grupo D</option>
+                        <option>Grupo E</option><option>Grupo F</option><option>Grupo G</option><option>Grupo H</option>
+                        <option>Grupo I</option><option>Grupo J</option><option>Grupo K</option><option>Grupo L</option>
+                    </optgroup>
+                    <optgroup label="Mata-Mata">
+                        <option>16 Avos</option>
+                        <option>Oitavas</option>
+                        <option>Quartas</option>
+                        <option>Semi</option>
+                        <option>Final</option>
+                    </optgroup>
+                </select>
+                <input type="text" id="adm-novo-data" placeholder="Data (ex: 28/06 - 16:00)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;font-size:0.85rem;box-sizing:border-box;">
+                <div style="display:flex;gap:6px;">
+                    <input type="text" id="adm-novo-time1" placeholder="Time 1" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;">
+                    <input type="text" id="adm-novo-time2" placeholder="Time 2" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;">
+                </div>
+                <button onclick="adicionarJogoAdmin()" style="width:100%;padding:8px;margin-top:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">Adicionar Jogo</button>
+            </div>
+
+            <div style="margin-bottom:10px;padding:12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;">
+                <p style="font-weight:bold;font-size:0.85rem;margin:0 0 8px;color:var(--primary);">🔄 Sincronizar resultados (worldcup26.ir)</p>
+                <button onclick="sincronizarAPI()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📡 Sincronizar resultados</button>
+                <div id="status-sync" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+            </div>
+
+            <div style="margin-bottom:10px;">
+                <button onclick="notificarTodos()" style="width:100%;padding:8px;background:var(--secondary);color:var(--text);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">🔔 Notificar todos sobre resultados</button>
+            </div>
+
+            <p style="font-size:0.8rem;color:#666;margin-bottom:10px;text-align:left;">Editar resultados ou excluir jogos:</p>
+            <div id="lista-jogos-admin" style="text-align: left; max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
             <button class="btn-acao" style="margin-top: 15px; background: #666;" onclick="fecharAdmin()">Fechar</button>
         </div>
     </div>
