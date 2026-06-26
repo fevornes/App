@@ -244,6 +244,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
             <span id="usuario-saudacao" style="font-weight: bold; font-size: 1.1rem;"></span>
             <div style="display: flex; gap: 6px;">
+                <button style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text);padding:0;" onclick="sincronizarAuto()" title="Atualizar resultados">🔄</button>
                 <button style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text);padding:0;" onclick="abrirPopupFiltros()" title="Meus Resultados">🎯</button>
                 <button class="btn-header-menu" onclick="abrirMenu()">☰</button>
             </div>
@@ -273,6 +274,7 @@
         <h3 style="margin-top: -10px; margin-bottom: 5px; color: var(--primary); font-size: 1.3rem;">⚙️ Menu</h3>
         
         <button class="btn-acao" style="background-color: var(--secondary); color: var(--text); padding: 10px; font-size: 0.95rem; margin-top: 0; margin-bottom: 5px;" onclick="abrirTutorialInstalacao()">📱 Instalar Aplicativo</button>
+        <button class="btn-acao" style="background-color: #666; color: white; padding: 8px; font-size: 0.8rem; margin-top: -8px;" onclick="atualizarApp()">🔄 Atualizar App</button>
 
         <hr class="menu-divisor">
         
@@ -382,6 +384,7 @@
         let jogos = [];
         let usuarioAtual = null;
         let valoresOriginais = {};
+        let valoresTemporarios = {};
         let jogosFinalizados = new Set();
         let jogosFinalizadosInicializado = false;
 
@@ -396,6 +399,37 @@
             const mes = parseInt(dataParts[1]) - 1;
             const hora = partes[1] || '00:00';
             return new Date(2026, mes, dia, ...hora.split(':'));
+        }
+
+        function salvarInputsTemporarios() {
+            valoresTemporarios = {};
+            if (!jogos) return;
+            jogos.forEach(jogo => {
+                const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                if (p1 && p2) {
+                    valoresTemporarios[`${jogo.id}_p1`] = p1.value;
+                    valoresTemporarios[`${jogo.id}_p2`] = p2.value;
+                }
+            });
+        }
+
+        function restaurarInputsTemporarios() {
+            if (Object.keys(valoresTemporarios).length === 0) return;
+            jogos.forEach(jogo => {
+                const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                if (p1 && p2) {
+                    const tmp1 = valoresTemporarios[`${jogo.id}_p1`];
+                    const tmp2 = valoresTemporarios[`${jogo.id}_p2`];
+                    if (tmp1 !== undefined && p1.value !== tmp1) p1.value = tmp1;
+                    if (tmp2 !== undefined && p2.value !== tmp2) p2.value = tmp2;
+                }
+            });
+            valoresTemporarios = {};
+            // valoresOriginais já foi definido pelo carregarJogosEJogadores com os valores do BD
+            // Só compara para atualizar o botão
+            atualizarEstadoBotao();
         }
 
         function abrirTutorialInstalacao() {
@@ -562,6 +596,7 @@
             // Real-time: quando alguém alterar resultados no banco, atualiza na tela
             banco.channel('jogos-rt')
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'jogos' }, () => {
+                    salvarInputsTemporarios();
                     carregarJogosEJogadores();
                 })
                 .subscribe();
@@ -606,6 +641,7 @@
                 }
                 jogosFinalizadosInicializado = true;
                 if (atualizados > 0) console.log('[AutoSync] Atualizados:', atualizados);
+                salvarInputsTemporarios();
                 await carregarJogosEJogadores();
             } catch (e) { console.error('[AutoSync] Erro:', e); }
         }
@@ -789,7 +825,7 @@
                         p1.oninput = p2.oninput = atualizarEstadoBotao;
                     }
                 });
-                atualizarEstadoBotao();
+                restaurarInputsTemporarios();
                 
             } catch (e) { console.error("Erro ao carregar do banco:", e); }
         }
@@ -1244,6 +1280,7 @@
 
                 jogosFinalizadosInicializado = true;
                 status.innerText = `✅ ${atualizados} atualizado(s), ${ignorados} ignorado(s).`;
+                salvarInputsTemporarios();
                 await carregarJogosEJogadores();
             } catch (e) {
                 status.innerText = '❌ Erro: ' + e.message;
@@ -1266,6 +1303,62 @@
             await carregarJogosEJogadores();
             renderizarListaJogosAdmin();
         }
+        function atualizarApp() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(regs => {
+                    regs.forEach(r => r.unregister());
+                });
+            }
+            caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+            window.location.reload();
+        }
+
+        // --- Admin: ver palpites de todos ---
+        async function verTodosPalpites() {
+            const div = document.getElementById('lista-palpites-admin');
+            div.innerHTML = 'Carregando...';
+            const { data: perfis } = await banco.from('perfis').select('id, nome');
+            const { data: todosPalpites } = await banco.from('palpites').select('*');
+            if (!perfis || !todosPalpites) { div.innerHTML = 'Erro ao carregar.'; return; }
+
+            let html = '';
+            for (const perfil of perfis) {
+                const palpitesUser = todosPalpites.filter(p => p.usuario_id === perfil.id);
+                const palpitesComJogo = palpitesUser.filter(p => jogos.some(j => j.id === p.jogo_id));
+                if (palpitesComJogo.length === 0) continue;
+
+                let pontos = 0;
+                let detalhes = '';
+                palpitesComJogo.forEach(p => {
+                    const jogo = jogos.find(j => j.id === p.jogo_id);
+                    if (!jogo) return;
+                    const r1 = jogo.res1, r2 = jogo.res2;
+                    const temResultado = r1 !== null && r2 !== null;
+                    let acerto = 0;
+                    if (temResultado) {
+                        acerto = (p.palpite_time1 === r1 && p.palpite_time2 === r2) ? 5
+                            : ((p.palpite_time1 > p.palpite_time2 && r1 > r2) || (p.palpite_time1 < p.palpite_time2 && r1 < r2) || (p.palpite_time1 === p.palpite_time2 && r1 === r2)) ? 3 : 0;
+                        pontos += acerto;
+                    }
+                    const corLinha = temResultado ? '' : 'style="background:#fffde7;padding:4px 2px;border-radius:4px;"';
+                    const resultadoStr = temResultado ? `${jogo.res1}x${jogo.res2}` : '?x?';
+                    const ptsStr = temResultado ? `<span style="color:${acerto === 5 ? 'green' : acerto === 3 ? '#666' : 'red'};">(+${acerto})</span>` : '<span style="color:#aaa;">(⏳ futuro)</span>';
+                    detalhes += `<div style="font-size:0.75rem;padding:2px 0;border-bottom:1px solid #f0f0f0;" ${corLinha}>
+                        ${jogo.time1} ${resultadoStr} ${jogo.time2}
+                        → Palpite: ${p.palpite_time1}-${p.palpite_time2}
+                        ${ptsStr}
+                        <span style="color:#999;font-size:0.7rem;"> ${jogo.data}</span>
+                    </div>`;
+                });
+
+                html += `<details style="margin-bottom:6px;font-size:0.85rem;">
+                    <summary style="cursor:pointer;font-weight:bold;padding:4px 0;"><strong>${perfil.nome}</strong> — ${pontos} pts</summary>
+                    ${detalhes}
+                </details>`;
+            }
+            div.innerHTML = html || '<div style="color:#888;padding:10px;">Nenhum palpite em jogos com resultado.</div>';
+        }
+
         // --- Limpar palpite individual ---
         async function limparPalpite(jogoId) {
             if (!confirm("Limpar este palpite?")) return;
@@ -1613,6 +1706,12 @@
                     <input type="text" id="adm-rename-new" placeholder="Novo nome" value="Holanda" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
                 </div>
                 <button onclick="renameTimeNoBanco()" style="width:100%;padding:6px;background:var(--primary);color:white;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;">Renomear</button>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">👁️ Ver palpites de todos</summary>
+                <div id="lista-palpites-admin" style="margin-top:8px;max-height:300px;overflow-y:auto;font-size:0.85rem;"></div>
+                <button onclick="verTodosPalpites()" style="width:100%;padding:6px;margin-top:6px;background:var(--primary);color:white;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;">Carregar</button>
             </details>
 
             <div style="font-size:0.8rem;color:#666;margin-bottom:6px;text-align:left;">Editar resultados:</div>
