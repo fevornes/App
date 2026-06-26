@@ -190,6 +190,17 @@
         .tutorial-passos ol { padding-left: 20px; margin: 10px 0; }
         .tutorial-passos li { margin-bottom: 8px; }
 
+        .onb-slide { display: none; }
+        .onb-slide.ativo { display: flex; flex-direction: column; align-items: center; }
+        .onb-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; transition: background 0.2s; }
+        .onb-dot.ativo { background: var(--primary); }
+        .btn-onb-nav { background: none; border: 1px solid #ddd; border-radius: 8px; color: #555; font-size: 0.85rem; cursor: pointer; padding: 8px 14px; transition: all 0.2s; }
+        .btn-onb-nav:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-onb-prox { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+        .btn-onb-prox:hover { background: #026d2e; border-color: #026d2e; color: #fff; }
+        .btn-onb-pular { display: block; margin: 14px auto 0; background: none; border: none; color: #bbb; font-size: 0.8rem; cursor: pointer; padding: 4px 8px; transition: color 0.2s; }
+        .btn-onb-pular:hover { color: #888; }
+
         .btn-limpar {
             background: none; border: none; color: #d93025; cursor: pointer;
             font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold;
@@ -364,6 +375,52 @@
         </div>
     </div>
 
+    <div class="popup-notificacao" id="popup-onboarding">
+        <div class="popup-conteudo" style="max-width: 420px; padding: 30px 25px;">
+            <h3 class="popup-titulo" style="margin-bottom: 8px;">Bem-vindo ao Meu Bolão! 🏆</h3>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">Veja como funciona:</p>
+            <div id="onboarding-slide" style="min-height: 280px; display: flex; flex-direction: column; justify-content: center;">
+                <div class="onb-slide ativo" data-step="1">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">⚽</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">1. Palpites</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">Digite seus palpites para cada jogo da Copa. Um palpite tem dois números: <strong>gols do time da casa</strong> × <strong>gols do time visitante</strong>.</p>
+                </div>
+                <div class="onb-slide" data-step="2">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">📋</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">2. Grupos</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">Use as abas <strong>Grupo A, B, C...</strong> para filtrar os jogos por grupo. Assim fica mais fácil organizar seus palpites.</p>
+                </div>
+                <div class="onb-slide" data-step="3">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">📊</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">3. Classificação</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">Acesse a <strong>Classificação</strong> para ver o ranking de todos os participantes. Clique em qualquer jogador para ver os palpites dele.</p>
+                </div>
+                <div class="onb-slide" data-step="4">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">📈</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">4. Estatísticas</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">No <strong>Perfil</strong> você vê suas estatísticas: acertos exatos, saldo de gols, evolução por rodada e muito mais.</p>
+                </div>
+                <div class="onb-slide" data-step="5">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">🔴</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">5. Modo Ao Vivo</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">Ative o <strong>Modo Ao Vivo 🔴</strong> para ver os resultados oficiais em tempo real ao lado dos seus palpites.</p>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 20px;">
+                <button onclick="onboardingAnterior()" id="btn-onb-ant" class="btn-onb-nav" style="visibility: hidden;">← Anterior</button>
+                <div id="onb-dots" style="display: flex; gap: 6px;">
+                    <span class="onb-dot ativo"></span>
+                    <span class="onb-dot"></span>
+                    <span class="onb-dot"></span>
+                    <span class="onb-dot"></span>
+                    <span class="onb-dot"></span>
+                </div>
+                <button onclick="onboardingProximo()" id="btn-onb-prox" class="btn-onb-nav btn-onb-prox">Próximo →</button>
+            </div>
+            <button onclick="fecharOnboarding()" class="btn-onb-pular">Pular tutorial</button>
+        </div>
+    </div>
+
     <div class="popup-notificacao" id="popup-reset-senha">
         <div class="popup-conteudo">
             <button onclick="fecharPopupResetSenha()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
@@ -439,6 +496,29 @@
 
         function fecharTutorialInstalacao() {
             document.getElementById('popup-tutorial').style.display = 'none';
+        }
+
+        let passoOnboarding = 1;
+        const totalOnboarding = 5;
+        function mostrarPassoOnboarding(passo) {
+            document.querySelectorAll('.onb-slide').forEach(s => s.classList.remove('ativo'));
+            document.querySelector(`.onb-slide[data-step="${passo}"]`).classList.add('ativo');
+            document.querySelectorAll('.onb-dot').forEach((d, i) => d.classList.toggle('ativo', i === passo - 1));
+            document.getElementById('btn-onb-ant').style.visibility = passo === 1 ? 'hidden' : 'visible';
+            document.getElementById('btn-onb-prox').textContent = passo === totalOnboarding ? 'Concluir ✓' : 'Próximo →';
+            passoOnboarding = passo;
+        }
+        function onboardingProximo() {
+            if (passoOnboarding >= totalOnboarding) { fecharOnboarding(); return; }
+            mostrarPassoOnboarding(passoOnboarding + 1);
+        }
+        function onboardingAnterior() {
+            if (passoOnboarding <= 1) return;
+            mostrarPassoOnboarding(passoOnboarding - 1);
+        }
+        async function fecharOnboarding() {
+            document.getElementById('popup-onboarding').style.display = 'none';
+            await banco.auth.updateUser({ data: { tutorial_visto: true } });
         }
 
         function mudarAbaTutorial(sistema) {
@@ -540,7 +620,7 @@
             if (!nome || !email || !password) return alert("Preencha todos os campos!");
 
             const { data, error } = await banco.auth.signUp({
-                email, password, options: { data: { nome: nome } }
+                email, password, options: { data: { nome: nome, tutorial_visto: false } }
             });
             if (error) return alert("Erro real: " + JSON.stringify(error));
 
@@ -577,6 +657,12 @@
             
             const { data } = await banco.from('perfis').select('nome').eq('id', usuarioAtual.id).single();
             document.getElementById('usuario-saudacao').innerText = `Olá, ${data ? data.nome : 'Jogador'}!`;
+
+            if (usuarioAtual.user_metadata?.tutorial_visto === false) {
+                passoOnboarding = 1;
+                mostrarPassoOnboarding(1);
+                document.getElementById('popup-onboarding').style.display = 'flex';
+            }
 
             await carregarJogosEJogadores();
             await carregarPalpitesFiltro();
