@@ -974,7 +974,6 @@
                     gruposContainer.appendChild(btn);
                 });
                 // Ativar aba: 16 Avos a partir de 28/06, senão primeiro dia
-                const hoje = new Date();
                 if (hoje >= new Date(2026, 5, 28)) {
                     const tab16 = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === '16 Avos');
                     if (tab16) tab16.click();
