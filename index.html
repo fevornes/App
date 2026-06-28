@@ -843,6 +843,31 @@
         }
 
         const tipoParaFase = { r32: '16 Avos', r16: 'Oitavas', qf: 'Quartas', sf: 'Semifinais', third: 'Disputa de 3º Lugar', final: 'Final' };
+        const horariosBrasilia = (function(){
+            const h = {};
+            const add = (t1, t2, data) => { h[t1+'|'+t2] = data; h[t2+'|'+t1] = data; };
+            add('África do Sul','Canadá','28/06 - 16:00');
+            add('Brasil','Japão','29/06 - 14:00');
+            add('Alemanha','Paraguai','29/06 - 17:30');
+            add('Países Baixos','Marrocos','29/06 - 22:00');
+            add('Costa do Marfim','Noruega','30/06 - 14:00');
+            add('França','Suécia','30/06 - 18:00');
+            add('México','Equador','30/06 - 22:00');
+            add('Inglaterra','RD Congo','01/07 - 13:00');
+            add('Bélgica','Senegal','01/07 - 17:00');
+            add('Estados Unidos','Bósnia e Herzegovina','01/07 - 21:00');
+            add('Espanha','Áustria','02/07 - 16:00');
+            add('Portugal','Croácia','02/07 - 20:00');
+            add('Suíça','Argélia','03/07 - 00:00');
+            add('Austrália','Egito','03/07 - 15:00');
+            add('Argentina','Cabo Verde','03/07 - 19:00');
+            add('Colômbia','Gana','03/07 - 22:30');
+            return h;
+        })();
+
+        function getDataBrasilia(time1, time2, apiData) {
+            return horariosBrasilia[time1+'|'+time2] || apiData;
+        }
 
         function parseScorers(str) {
             if (!str || str === 'null' || str === '[]') return [];
@@ -885,13 +910,14 @@
                     const grupo = tipoParaFase[match.type];
                     const jogosNoGrupo = existentes?.filter(j => j.grupo === grupo) || [];
 
-                    // 1) Exact match (both teams, any order) → sync scores only
+                    // 1) Exact match (both teams, any order) → sync scores + fix time
                     if (timeCasa && timeFora) {
                         const exato = jogosNoGrupo.find(j =>
                             (j.time1 === timeCasa && j.time2 === timeFora) || (j.time1 === timeFora && j.time2 === timeCasa)
                         );
                         if (exato) {
                             await atualizarResultadoSePrecisar(exato, match, timeCasa, timeFora);
+                            await corrigirDataSePrecisar(exato, timeCasa, timeFora);
                             continue;
                         }
                     }
@@ -937,13 +963,17 @@
                         if (timeCasa && timeFora) {
                             await atualizarResultadoSePrecisar(achado, match, timeCasa, timeFora);
                         }
+                        const t1corrigido = timeCasa || achado.time1;
+                        const t2corrigido = timeFora || achado.time2;
+                        if (t1corrigido && t2corrigido) await corrigirDataSePrecisar(achado, t1corrigido, t2corrigido);
                         continue;
                     }
 
                     // 4) Both teams known and no match, OR no match for this grupo at all → insert new
                     if (jogosNoGrupo.length === 0 || (timeCasa && timeFora)) {
                         const partes = match.local_date.split(' ');
-                        const dataFormatada = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
+                        const dataApi = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
+                        const dataFormatada = (timeCasa && timeFora) ? getDataBrasilia(timeCasa, timeFora, dataApi) : dataApi;
                         const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
                         const novoId = (maxId?.[0]?.id || 0) + 1;
                         const insertData = { id: novoId, grupo, data: dataFormatada, time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null };
@@ -964,6 +994,14 @@
                 const el = document.getElementById('status-import');
                 if (el) el.innerText = '❌ Erro ao importar: ' + e.message;
                 return 0; }
+        }
+
+        async function corrigirDataSePrecisar(jogoBD, t1, t2) {
+            const correta = getDataBrasilia(t1, t2, null);
+            if (correta && jogoBD.data !== correta) {
+                await banco.from('jogos').update({ data: correta }).eq('id', jogoBD.id);
+                console.log('[ImportMM] Data corrigida:', jogoBD.id, jogoBD.data, '→', correta);
+            }
         }
 
         async function atualizarResultadoSePrecisar(jogoBD, match, timeCasa, timeFora) {
@@ -2087,7 +2125,8 @@
                     const timeCasa = match.home_team_name_en ? (en2pt[match.home_team_name_en] || match.home_team_name_en) : null;
                     const timeFora = match.away_team_name_en ? (en2pt[match.away_team_name_en] || match.away_team_name_en) : null;
                     const partes = match.local_date.split(' ');
-                    const dataFormatada = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
+                    const dataApi = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
+                    const dataFormatada = (timeCasa && timeFora) ? getDataBrasilia(timeCasa, timeFora, dataApi) : dataApi;
                     const { error } = await banco.from('jogos').insert({
                         id: novoId++, grupo: '16 Avos', data: dataFormatada,
                         time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null
