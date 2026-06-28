@@ -742,7 +742,7 @@
             } catch (e) { console.error('[AutoSync] Erro:', e); }
         }
 
-        const tipoParaFase = { r32: '16 Avos', r16: 'Oitavas', qf: 'Quartas', sf: 'Semi', third: '3º Lugar', final: 'Final' };
+        const tipoParaFase = { r32: '16 Avos', r16: 'Oitavas', qf: 'Quartas', sf: 'Semifinais', third: 'Disputa de 3º Lugar', final: 'Final' };
 
         async function importarMataMata() {
             const el = document.getElementById('status-import');
@@ -757,37 +757,47 @@
 
         async function importarMataMataAPI() {
             try {
+                console.log('[ImportMM] Buscando jogos da API...');
                 const resp = await fetch('https://worldcup26.ir/get/games');
-                if (!resp.ok) return;
+                if (!resp.ok) { console.error('[ImportMM] API status:', resp.status); return 0; }
                 const data = await resp.json();
                 const matches = data.games || [];
-                const { data: existentes } = await banco.from('jogos').select('id, time1, time2, grupo');
+                console.log('[ImportMM] Total jogos da API:', matches.length);
+                const knockouts = matches.filter(m => tipoParaFase[m.type]);
+                console.log('[ImportMM] Jogos mata-mata:', knockouts.length);
+                const comTimes = knockouts.filter(m => m.home_team_name_en && m.away_team_name_en && m.home_team_name_en !== '' && m.away_team_name_en !== '');
+                console.log('[ImportMM] Com times:', comTimes.length);
+                comTimes.forEach(m => console.log(`  ${m.type}: ${m.home_team_name_en} vs ${m.away_team_name_en}`));
+                const { data: existentes, error: errEx } = await banco.from('jogos').select('id, time1, time2, grupo');
+                if (errEx) { console.error('[ImportMM] Erro select:', errEx); return 0; }
                 let importados = 0;
-                for (const match of matches) {
-                    if (match.type === 'group' || !tipoParaFase[match.type]) continue;
-                    if (match.home_team_id === '0' || match.away_team_id === '0') continue;
+                for (const match of comTimes) {
                     const timeCasa = en2pt[match.home_team_name_en] || match.home_team_name_en;
                     const timeFora = en2pt[match.away_team_name_en] || match.away_team_name_en;
-                    if (!timeCasa || !timeFora) continue;
+                    if (!timeCasa || !timeFora) { console.log('[ImportMM] Sem tradução:', match.home_team_name_en, match.away_team_name_en); continue; }
                     const grupo = tipoParaFase[match.type];
                     const jaExiste = existentes?.find(j =>
                         ((j.time1 === timeCasa && j.time2 === timeFora) || (j.time1 === timeFora && j.time2 === timeCasa)) &&
                         j.grupo === grupo
                     );
-                    if (jaExiste) continue;
+                    if (jaExiste) { console.log('[ImportMM] Já existe:', timeCasa, 'x', timeFora, grupo); continue; }
                     const partes = match.local_date.split(' ');
-                    const dataFormatada = `${partes[0].split('/').slice(0,2).join('/')} - ${partes[1] || '00:00'}`;
+                    const dataFormatada = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
                     const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
-                    await banco.from('jogos').insert({
-                        id: (maxId?.[0]?.id || 0) + 1, grupo, data: dataFormatada,
+                    const novoId = (maxId?.[0]?.id || 0) + 1;
+                    const { error: errIns } = await banco.from('jogos').insert({
+                        id: novoId, grupo, data: dataFormatada,
                         time1: timeCasa, time2: timeFora, res1: null, res2: null
                     });
+                    if (errIns) { console.error('[ImportMM] Erro insert:', errIns, timeCasa, 'x', timeFora); continue; }
+                    console.log('[ImportMM] Inserido:', novoId, grupo, timeCasa, 'x', timeFora, dataFormatada);
                     importados++;
                 }
+                console.log('[ImportMM] Total importados:', importados);
                 return importados;
             } catch (e) { console.error('[ImportMM] Erro:', e);
                 const el = document.getElementById('status-import');
-                if (el) el.innerText = '❌ Erro ao importar';
+                if (el) el.innerText = '❌ Erro ao importar: ' + e.message;
                 return 0; }
         }
 
@@ -839,8 +849,9 @@
                 tabsContainer.innerHTML = '';
 
                 const fasesMataMata = [...new Set(jogos.filter(j => !j.grupo.startsWith('Grupo')).map(j => j.grupo))];
-                const fasesOrdem = ['16 Avos', 'Oitavas', 'Quartas', 'Semi', '3º Lugar', 'Final'];
+                const fasesOrdem = ['16 Avos', 'Oitavas', 'Quartas', 'Semifinais', 'Disputa de 3º Lugar', 'Final'];
                 fasesMataMata.sort((a, b) => fasesOrdem.indexOf(a) - fasesOrdem.indexOf(b));
+                const ehMataMata = fasesMataMata.length > 0;
 
                 function limparAbas() {
                     document.querySelectorAll('#dias-tabs .tab-btn').forEach(b => b.classList.remove('ativo'));
@@ -852,51 +863,41 @@
                     document.getElementById('container-fase').style.display = 'none';
                 }
 
-                diasUnicos.forEach(dia => {
-                    const btn = document.createElement('button');
-                    btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
-                    btn.innerText = `Dia ${dia}`;
-                    btn.onclick = () => {
-                        limparAbas();
-                        btn.classList.add('ativo');
-                        mostrarContainerJogos();
-                        document.getElementById('grupo-tabs').style.display = 'none';
-                        filtrarJogosNaTela(dia);
-                        abaAtiva = 'dia';
-                    };
-                    tabsContainer.appendChild(btn);
-                });
+                // Criar abas de dia (fase de grupos) - filtradas pelas configuracoes
+                const diasVisiveis = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+                const diasParaMostrar = diasVisiveis || diasUnicos;
+                diasUnicos.filter(d => diasParaMostrar.includes(d)).forEach(dia => {
+                        const btn = document.createElement('button');
+                        btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
+                        btn.innerText = `Dia ${dia}`;
+                        btn.onclick = () => {
+                            limparAbas();
+                            btn.classList.add('ativo');
+                            mostrarContainerJogos();
+                            document.getElementById('grupo-tabs').style.display = 'none';
+                            filtrarJogosNaTela(dia);
+                            abaAtiva = 'dia';
+                        };
+                        tabsContainer.appendChild(btn);
+                    });
 
-                fasesMataMata.forEach(fase => {
-                    const btn = document.createElement('button');
-                    btn.className = 'tab-btn';
-                    btn.innerText = fase;
-                    btn.onclick = () => {
-                        limparAbas();
-                        btn.classList.add('ativo');
-                        document.getElementById('container-jogos').style.display = 'none';
-                        document.getElementById('container-fase').style.display = 'block';
-                        document.getElementById('grupo-tabs').style.display = 'none';
-                        const jogosFase = jogos.filter(j => j.grupo === fase);
-                        const porDia = {};
-                        jogosFase.forEach(j => {
-                            const dia = j.data.split(' - ')[0];
-                            if (!porDia[dia]) porDia[dia] = [];
-                            porDia[dia].push(j);
-                        });
-                        const diasOrdem = Object.keys(porDia).sort((a, b) => {
-                            const [da, ma] = a.split('/');
-                            const [db, mb] = b.split('/');
-                            return (parseInt(ma) * 100 + parseInt(da)) - (parseInt(mb) * 100 + parseInt(db));
-                        });
-                        const nomesDias = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-                        let html = `<div style="padding:8px 0;font-size:0.95rem;font-weight:bold;color:var(--primary);">🏆 ${fase}</div>`;
-                        diasOrdem.forEach(dia => {
-                            const [dd, mm] = dia.split('/');
-                            const dt = new Date(2026, parseInt(mm) - 1, parseInt(dd));
-                            const nomeDia = nomesDias[dt.getDay()];
-                            html += `<div style="margin-top:14px;font-weight:bold;font-size:0.85rem;">${nomeDia} (${dia})</div>`;
-                            porDia[dia].forEach(j => {
+                // Se existir mata-mata, adicionar abas de fase ao final
+                if (ehMataMata) {
+                    fasesMataMata.forEach(fase => {
+                        const btn = document.createElement('button');
+                        btn.className = 'tab-btn';
+                        btn.innerText = fase;
+                        btn.onclick = () => {
+                            limparAbas();
+                            btn.classList.add('ativo');
+                            document.getElementById('container-jogos').style.display = 'none';
+                            document.getElementById('container-fase').style.display = 'block';
+                            document.getElementById('grupo-tabs').style.display = 'none';
+                            const jogosFase = jogos.filter(j => j.grupo === fase).sort((a, b) => {
+                                return getDataJogo(a.data).getTime() - getDataJogo(b.data).getTime();
+                            });
+                            let html = '';
+                            jogosFase.forEach(j => {
                                 const palpite = palpitesSalvos?.find(p => p.jogo_id === j.id);
                                 const p1Value = palpite ? palpite.palpite_time1 : '';
                                 const p2Value = palpite ? palpite.palpite_time2 : '';
@@ -910,46 +911,58 @@
                                     else if ((p1 > p2 && j.res1 > j.res2) || (p1 < p2 && j.res1 < j.res2) || (p1 === p2 && j.res1 === j.res2)) classeCard = 'acerto-vencedor';
                                     else classeCard = 'erro-total';
                                 }
+                                let infoLinha = `${fase} • ${j.data}`;
+                                if (temResultado) infoLinha += ` | (Real: ${j.time1} ${j.res1} x ${j.res2} ${j.time2})`;
+                                const temPalpiteFase = p1Value !== '' && p2Value !== '';
+                                const ehFinalizadoFase = !jogosFinalizadosInicializado || jogosFinalizados.has(j.id);
+                                const ehAoVivoFase = temResultado && encerrado && !ehFinalizadoFase;
+                                let labelFase = '';
+                                if (ehAoVivoFase) labelFase = '<div style="font-size:0.75rem;color:#dc3545;text-align:center;margin-top:5px;"><span class="live-indicator"></span>AO VIVO</div>';
+                                else if (temResultado) labelFase = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Encerrado</div>';
+                                else if (encerrado) labelFase = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Palpite encerrado</div>';
+                                const btnLimparFase = !encerrado && temPalpiteFase
+                                    ? `<button class="btn-limpar" onclick="limparPalpite(${j.id})" title="Limpar palpite">✕ Limpar</button>` : '';
                                 html += `<div class="jogo-card ${classeCard}" style="display:flex;flex-direction:column;padding:10px;margin:6px 0;border-radius:8px;">`;
-                                html += `<div style="font-size:0.75rem;color:#888;text-align:center;">${rotuloJogo(j)}</div>`;
+                                html += `<div style="font-size:0.75rem;color:#888;text-align:center;">${infoLinha}</div>`;
                                 html += `<div class="placar-container"><div class="time mandante">${j.time1}</div>`;
                                 html += `<input type="number" id="jogo_${j.id}_p1" min="0" value="${p1Value}" ${disabledAttr}>`;
                                 html += `<span>X</span>`;
                                 html += `<input type="number" id="jogo_${j.id}_p2" min="0" value="${p2Value}" ${disabledAttr}>`;
                                 html += `<div class="time visitante">${j.time2}</div></div>`;
-                                if (temResultado) html += `<div style="text-align:center;font-size:0.75rem;color:#888;margin-top:4px;">🔒 Encerrado</div>`;
-                                else if (encerrado) html += `<div style="text-align:center;font-size:0.75rem;color:#888;margin-top:4px;">🔒 Palpite encerrado</div>`;
-                                html += '</div>';
+                                html += `<div style="display:flex;justify-content:space-between;align-items:center;min-height:20px;">`;
+                                html += `<div>${btnLimparFase}</div>`;
+                                html += labelFase;
+                                html += '</div></div>';
                             });
-                        });
-                        document.getElementById('container-fase').innerHTML = html;
-                        jogosFase.forEach(j => {
-                            const p1 = document.getElementById(`jogo_${j.id}_p1`);
-                            const p2 = document.getElementById(`jogo_${j.id}_p2`);
-                            if (p1 && p2) {
-                                valoresOriginais[`${j.id}_p1`] = p1.value;
-                                valoresOriginais[`${j.id}_p2`] = p2.value;
-                            }
-                        });
-                        atualizarEstadoBotao();
-                        abaAtiva = 'fase';
-                    };
-                    tabsContainer.appendChild(btn);
-                });
+                            document.getElementById('container-fase').innerHTML = html;
+                            jogosFase.forEach(j => {
+                                const p1 = document.getElementById(`jogo_${j.id}_p1`);
+                                const p2 = document.getElementById(`jogo_${j.id}_p2`);
+                                if (p1 && p2) {
+                                    valoresOriginais[`${j.id}_p1`] = p1.value;
+                                    valoresOriginais[`${j.id}_p2`] = p2.value;
+                                }
+                            });
+                            atualizarEstadoBotao();
+                            abaAtiva = 'fase';
+                        };
+                        tabsContainer.appendChild(btn);
+                    });
+                }
 
                 // Abas de grupos (só aparecem quando clica em "Grupo X" no ranking)
-                const gruposUnicos = [...new Set(jogos.map(j => j.grupo))];
+                const gruposUnicos = [...new Set(jogos.filter(j => j.grupo.startsWith('Grupo')).map(j => j.grupo))];
                 const gruposContainer = document.getElementById('grupo-tabs');
                 gruposContainer.innerHTML = '';
                 const btnVoltarDia = document.createElement('button');
                 btnVoltarDia.className = 'tab-btn';
-                btnVoltarDia.innerText = '⬅ Dias';
+                btnVoltarDia.innerText = '⬅ Voltar';
                 btnVoltarDia.onclick = () => {
                     document.getElementById('grupo-tabs').style.display = 'none';
                     mostrarContainerJogos();
                     limparAbas();
-                    const diaAtivoBtn = document.querySelector('#dias-tabs .tab-btn');
-                    if (diaAtivoBtn) diaAtivoBtn.click();
+                    const primeiroTab = document.querySelector('#dias-tabs .tab-btn');
+                    if (primeiroTab) primeiroTab.click();
                 };
                 gruposContainer.appendChild(btnVoltarDia);
                 gruposUnicos.forEach(grupo => {
@@ -960,9 +973,16 @@
                     btn.onclick = () => alternarAbaGrupo(grupo);
                     gruposContainer.appendChild(btn);
                 });
-                // Ativar primeiro dia por padrão
-                const primeiroTab = document.querySelector('#dias-tabs .tab-btn');
-                if (primeiroTab) primeiroTab.click();
+                // Ativar aba: 16 Avos a partir de 28/06, senão primeiro dia
+                const hoje = new Date();
+                if (hoje >= new Date(2026, 5, 28)) {
+                    const tab16 = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === '16 Avos');
+                    if (tab16) tab16.click();
+                    else { const p = document.querySelector('#dias-tabs .tab-btn'); if (p) p.click(); }
+                } else {
+                    const p = document.querySelector('#dias-tabs .tab-btn');
+                    if (p) p.click();
+                }
 
                 jogos.forEach(jogo => {
                     const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
@@ -1531,6 +1551,84 @@
             window.location.reload();
         }
 
+        function abrirPopupDias() {
+            fecharMenu();
+            const container = document.getElementById('lista-dias-popup');
+            container.innerHTML = '';
+            const todosDias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
+            todosDias.sort((a, b) => {
+                const [dA, mA] = a.split('/').map(Number);
+                const [dB, mB] = b.split('/').map(Number);
+                return mA - mB || dA - dB;
+            });
+            const salvos = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+            const visiveis = salvos || todosDias;
+            todosDias.forEach(dia => {
+                const checked = visiveis.includes(dia) ? 'checked' : '';
+                container.innerHTML += `
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #eee;cursor:pointer;font-size:0.9rem;">
+                        <input type="checkbox" class="dia-check" value="${dia}" ${checked} style="width:18px;height:18px;">
+                        Dia ${dia}
+                    </label>
+                `;
+            });
+            document.getElementById('popup-dias').style.display = 'flex';
+        }
+        function fecharPopupDias() {
+            document.getElementById('popup-dias').style.display = 'none';
+        }
+        function salvarDiasVisiveis() {
+            const checks = document.querySelectorAll('.dia-check');
+            const selecionados = [];
+            checks.forEach(c => { if (c.checked) selecionados.push(c.value); });
+            if (selecionados.length === 0) {
+                localStorage.removeItem('diasVisiveis');
+            } else {
+                localStorage.setItem('diasVisiveis', JSON.stringify(selecionados));
+            }
+            fecharPopupDias();
+            carregarJogosEJogadores();
+        }
+
+        async function corrigir16Avos() {
+            const el = document.getElementById('status-corrigir');
+            if (!confirm("Isso vai DELETAR todos os jogos de 16 Avos e recriar com os dados corretos. Continuar?")) return;
+            el.innerText = '🔄 Deletando jogos antigos...';
+            try {
+                const { error: errDel } = await banco.from('jogos').delete().eq('grupo', '16 Avos');
+                if (errDel) throw errDel;
+
+                const { data: maxIdData } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
+                let novoId = (maxIdData?.[0]?.id || 0) + 1;
+
+                const jogosCorretos = [
+                    { time1: 'África do Sul', time2: 'Canadá', data: '28/06 - 16:00' },
+                    { time1: 'Brasil', time2: 'Japão', data: '29/06 - 14:00' },
+                    { time1: 'Alemanha', time2: 'Paraguai', data: '29/06 - 17:30' },
+                    { time1: 'Holanda', time2: 'Marrocos', data: '29/06 - 22:00' },
+                    { time1: 'França', time2: 'Suécia', data: '30/06 - 18:00' },
+                    { time1: 'Costa do Marfim', time2: 'Noruega', data: '30/06 - 14:00' },
+                    { time1: 'Estados Unidos', time2: 'Bósnia e Herzegovina', data: '01/07 - 21:00' },
+                    { time1: 'Austrália', time2: 'Egito', data: '03/07 - 15:00' },
+                    { time1: 'Argentina', time2: 'Cabo Verde', data: '03/07 - 19:00' }
+                ];
+
+                el.innerText = `🔄 Inserindo ${jogosCorretos.length} jogos...`;
+                for (const j of jogosCorretos) {
+                    const { error } = await banco.from('jogos').insert({
+                        id: novoId++, grupo: '16 Avos', data: j.data,
+                        time1: j.time1, time2: j.time2, res1: null, res2: null
+                    });
+                    if (error) console.error('Erro insert:', error);
+                }
+
+                el.innerText = `✅ ${jogosCorretos.length} jogos de 16 Avos corrigidos!`;
+                await carregarJogosEJogadores();
+            } catch (e) {
+                el.innerText = '❌ Erro: ' + e.message;
+            }
+        }
+
         // --- Admin: ver palpites de todos ---
         async function verTodosPalpites() {
             const div = document.getElementById('lista-palpites-admin');
@@ -1892,7 +1990,8 @@
                         <option>16 Avos</option>
                         <option>Oitavas</option>
                         <option>Quartas</option>
-                        <option>Semi</option>
+                        <option>Semifinais</option>
+                        <option>Disputa de 3º Lugar</option>
                         <option>Final</option>
                     </optgroup>
                 </select>
@@ -1917,6 +2016,21 @@
                 <div style="margin-top:8px;">
                 <button onclick="importarMataMata()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📥 Importar jogos da API</button>
                 <div id="status-import" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">🔧 Corrigir 16 Avos</summary>
+                <div style="margin-top:8px;">
+                <button onclick="corrigir16Avos()" style="width:100%;padding:8px;background:#d93025;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">🗑️ Deletar e recriar 16 Avos com dados corretos</button>
+                <div id="status-corrigir" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">👁️ Dias Visíveis</summary>
+                <div style="margin-top:8px;">
+                <button onclick="abrirPopupDias()" style="width:100%;padding:8px;background:var(--secondary);color:var(--text);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">🗓️ Selecionar dias visíveis</button>
                 </div>
             </details>
 
@@ -1946,6 +2060,19 @@
             <select id="filtro-dia-admin" onchange="renderizarListaJogosAdmin()" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;margin-bottom:8px;"></select>
             <div id="lista-jogos-admin" style="text-align: left; max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
             <button class="btn-acao" style="margin-top: 15px; background: #666;" onclick="fecharAdmin()">Fechar</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-dias">
+        <div class="popup-conteudo" style="max-width: 400px;">
+            <button onclick="fecharPopupDias()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">🗓️ Dias Visíveis</h3>
+            <p style="font-size:0.8rem;color:#888;margin:-5px 0 15px;">Marque os dias que deseja mostrar nas abas:</p>
+            <div id="lista-dias-popup" style="max-height:350px;overflow-y:auto;"></div>
+            <div style="display:flex;gap:8px;margin-top:15px;">
+                <button onclick="salvarDiasVisiveis()" class="btn-acao" style="flex:1;">Salvar</button>
+                <button onclick="fecharPopupDias()" class="btn-acao" style="flex:1;background:#666;">Fechar</button>
+            </div>
         </div>
     </div>
 </body>
