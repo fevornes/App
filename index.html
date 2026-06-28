@@ -780,6 +780,8 @@
                 if (!todosJogos) { console.warn('[AutoSync] Nenhum jogo no banco'); return; }
 
                 await importarMataMataAPI();
+                const { data: todosJogosAtual } = await banco.from('jogos').select('*');
+                if (todosJogosAtual) todosJogos = todosJogosAtual;
                 let atualizados = 0;
                 jogosFinalizados = new Set();
                 for (const match of matches) {
@@ -873,55 +875,88 @@
                 const matches = data.games || [];
                 const knockouts = matches.filter(m => tipoParaFase[m.type]);
                 console.log('[ImportMM] Jogos mata-mata:', knockouts.length);
-                const comTimes = knockouts.filter(m => m.home_team_name_en && m.away_team_name_en && m.home_team_name_en !== '' && m.away_team_name_en !== '');
-                console.log('[ImportMM] Com times:', comTimes.length);
-                const { data: existentes, error: errEx } = await banco.from('jogos').select('id, time1, time2, grupo');
+                const { data: existentes, error: errEx } = await banco.from('jogos').select('id, time1, time2, grupo, res1, res2, home_scorers, away_scorers');
                 if (errEx) { console.error('[ImportMM] Erro select:', errEx); return 0; }
+                function ehPlaceholder(t) { return !t || t === 'A definir' || t.includes('Winner') || t.includes('Vencedor'); }
                 let importados = 0;
-                for (const match of comTimes) {
-                    const timeCasa = en2pt[match.home_team_name_en] || match.home_team_name_en;
-                    const timeFora = en2pt[match.away_team_name_en] || match.away_team_name_en;
-                    if (!timeCasa || !timeFora) continue;
+                for (const match of knockouts) {
+                    const timeCasa = match.home_team_name_en ? (en2pt[match.home_team_name_en] || match.home_team_name_en) : null;
+                    const timeFora = match.away_team_name_en ? (en2pt[match.away_team_name_en] || match.away_team_name_en) : null;
                     const grupo = tipoParaFase[match.type];
+                    const jogosNoGrupo = existentes?.filter(j => j.grupo === grupo) || [];
 
-                    const jaExiste = existentes?.find(j =>
-                        ((j.time1 === timeCasa && j.time2 === timeFora) || (j.time1 === timeFora && j.time2 === timeCasa)) &&
-                        j.grupo === grupo
-                    );
-                    if (jaExiste) { console.log('[ImportMM] Já existe:', timeCasa, 'x', timeFora, grupo); continue; }
+                    // 1) Exact match (both teams, any order) → sync scores only
+                    if (timeCasa && timeFora) {
+                        const exato = jogosNoGrupo.find(j =>
+                            (j.time1 === timeCasa && j.time2 === timeFora) || (j.time1 === timeFora && j.time2 === timeCasa)
+                        );
+                        if (exato) {
+                            await atualizarResultadoSePrecisar(exato, match, timeCasa, timeFora);
+                            continue;
+                        }
+                    }
 
-                    const placeholder = existentes?.find(j =>
-                        j.grupo === grupo && (j.time1 === 'A definir' || j.time2 === 'A definir' || j.time1.includes('Winner') || j.time2.includes('Winner') || j.time1.includes('Vencedor') || j.time2.includes('Vencedor'))
-                    );
-                    if (placeholder) {
-                        const updateFields = {};
-                        if (placeholder.time1 === 'A definir' || placeholder.time1.includes('Winner') || placeholder.time1.includes('Vencedor')) updateFields.time1 = timeCasa;
-                        if (placeholder.time2 === 'A definir' || placeholder.time2.includes('Winner') || placeholder.time2.includes('Vencedor')) updateFields.time2 = timeFora;
+                    // 2) Partial match: try to match by one known team
+                    let achado = null;
+                    const updateFields = {};
+                    for (const j of jogosNoGrupo) {
+                        if (timeCasa && j.time1 === timeCasa && (ehPlaceholder(j.time2) || (timeFora && j.time2 !== timeFora))) {
+                            if (timeFora && ehPlaceholder(j.time2)) updateFields.time2 = timeFora;
+                            achado = j; break;
+                        }
+                        if (timeFora && j.time2 === timeFora && (ehPlaceholder(j.time1) || (timeCasa && j.time1 !== timeCasa))) {
+                            if (timeCasa && ehPlaceholder(j.time1)) updateFields.time1 = timeCasa;
+                            achado = j; break;
+                        }
+                        if (timeCasa && j.time2 === timeCasa && (ehPlaceholder(j.time1) || (timeFora && j.time1 !== timeFora))) {
+                            if (timeFora && ehPlaceholder(j.time1)) updateFields.time1 = timeFora;
+                            achado = j; break;
+                        }
+                        if (timeFora && j.time1 === timeFora && (ehPlaceholder(j.time2) || (timeCasa && j.time2 !== timeCasa))) {
+                            if (timeCasa && ehPlaceholder(j.time2)) updateFields.time2 = timeCasa;
+                            achado = j; break;
+                        }
+                    }
+
+                    // 3) No partial match, but both teams known → take first placeholder in group
+                    if (!achado && timeCasa && timeFora) {
+                        const ph = jogosNoGrupo.find(j => ehPlaceholder(j.time1) && ehPlaceholder(j.time2));
+                        if (ph) {
+                            updateFields.time1 = timeCasa;
+                            updateFields.time2 = timeFora;
+                            achado = ph;
+                        }
+                    }
+
+                    if (achado) {
                         if (Object.keys(updateFields).length > 0) {
-                            await banco.from('jogos').update(updateFields).eq('id', placeholder.id);
-                            console.log('[ImportMM] Atualizado placeholder:', placeholder.id, updateFields);
+                            await banco.from('jogos').update(updateFields).eq('id', achado.id);
+                            console.log('[ImportMM] Atualizado jogo', achado.id, ':', JSON.stringify(updateFields));
                             importados++;
+                        }
+                        if (timeCasa && timeFora) {
+                            await atualizarResultadoSePrecisar(achado, match, timeCasa, timeFora);
                         }
                         continue;
                     }
 
-                    const partes = match.local_date.split(' ');
-                    const dataFormatada = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
-                    const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
-                    const novoId = (maxId?.[0]?.id || 0) + 1;
-                    const insertData = {
-                        id: novoId, grupo, data: dataFormatada,
-                        time1: timeCasa, time2: timeFora, res1: null, res2: null
-                    };
-                    try {
-                        const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
-                        const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
-                        if (hs || as) { insertData.home_scorers = hs; insertData.away_scorers = as; }
-                    } catch (e) {}
-                    const { error: errIns } = await banco.from('jogos').insert(insertData);
-                    if (errIns) { console.error('[ImportMM] Erro insert:', errIns); continue; }
-                    console.log('[ImportMM] Inserido:', novoId, grupo, timeCasa, 'x', timeFora, dataFormatada);
-                    importados++;
+                    // 4) Both teams known and no match, OR no match for this grupo at all → insert new
+                    if (jogosNoGrupo.length === 0 || (timeCasa && timeFora)) {
+                        const partes = match.local_date.split(' ');
+                        const dataFormatada = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
+                        const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
+                        const novoId = (maxId?.[0]?.id || 0) + 1;
+                        const insertData = { id: novoId, grupo, data: dataFormatada, time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null };
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            if (hs || as) { insertData.home_scorers = hs; insertData.away_scorers = as; }
+                        } catch (e) {}
+                        const { error: errIns } = await banco.from('jogos').insert(insertData);
+                        if (errIns) { console.error('[ImportMM] Erro insert:', errIns); continue; }
+                        console.log('[ImportMM] Inserido:', novoId, grupo, timeCasa || 'A definir', 'x', timeFora || 'A definir', dataFormatada);
+                        importados++;
+                    }
                 }
                 console.log('[ImportMM] Total importados/atualizados:', importados);
                 return importados;
@@ -929,6 +964,38 @@
                 const el = document.getElementById('status-import');
                 if (el) el.innerText = '❌ Erro ao importar: ' + e.message;
                 return 0; }
+        }
+
+        async function atualizarResultadoSePrecisar(jogoBD, match, timeCasa, timeFora) {
+            const gc = parseInt(match.home_score);
+            const gf = parseInt(match.away_score);
+            if (isNaN(gc) || isNaN(gf)) return;
+            const res1 = jogoBD.time1 === timeCasa ? gc : gf;
+            const res2 = jogoBD.time1 === timeCasa ? gf : gc;
+            if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+                const updateData = { res1, res2 };
+                try {
+                    const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                    const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                    if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
+                } catch (e) {}
+                try {
+                    await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                } catch (e) {
+                    delete updateData.home_scorers; delete updateData.away_scorers;
+                    await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                }
+            } else {
+                try {
+                    const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                    const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                    const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
+                    const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
+                    if ((hs || null) !== hsBD || (as || null) !== asBD) {
+                        try { await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id); } catch (e) {}
+                    }
+                } catch (e) {}
+            }
         }
 
         async function carregarJogosEJogadores() {
@@ -1727,20 +1794,24 @@
             const container = document.getElementById('lista-jogos-admin');
             container.innerHTML += `
                 <div style="margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid #eee;">
-                    <div style="font-size:0.75rem;color:#888;margin-bottom:2px;">${rotuloJogo(jogo)}</div>
-                    <div style="display:flex;align-items:center;gap:6px;">
-                        <span style="flex:1;font-size:0.85rem;min-width:0;">${jogo.time1} x ${jogo.time2}</span>
-                        <input type="number" id="adm_r1_${jogo.id}" value="${jogo.res1 !== null ? jogo.res1 : ''}" style="width:38px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;">
+                    <div style="font-size:0.75rem;color:#888;margin-bottom:2px;">${rotuloJogo(jogo)} • ID ${jogo.id}</div>
+                    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                        <input type="text" id="adm_t1_${jogo.id}" value="${jogo.time1}" style="flex:1;min-width:60px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
                         <span style="font-size:0.8rem;">x</span>
-                        <input type="number" id="adm_r2_${jogo.id}" value="${jogo.res2 !== null ? jogo.res2 : ''}" style="width:38px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;">
-                        <button onclick="salvarResultadoAdmin(${jogo.id})" style="padding:4px 8px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;">Salvar</button>
-                        <button onclick="excluirJogoAdmin(${jogo.id})" style="padding:4px 8px;background:#d93025;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;">×</button>
+                        <input type="text" id="adm_t2_${jogo.id}" value="${jogo.time2}" style="flex:1;min-width:60px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                        <input type="number" id="adm_r1_${jogo.id}" value="${jogo.res1 !== null ? jogo.res1 : ''}" style="width:35px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                        <span style="font-size:0.8rem;">x</span>
+                        <input type="number" id="adm_r2_${jogo.id}" value="${jogo.res2 !== null ? jogo.res2 : ''}" style="width:35px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                        <button onclick="salvarResultadoAdmin(${jogo.id})" style="padding:4px 6px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;">💾</button>
+                        <button onclick="excluirJogoAdmin(${jogo.id})" style="padding:4px 6px;background:#d93025;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;">🗑️</button>
                     </div>
                 </div>
             `;
         }
 
         async function salvarResultadoAdmin(id) {
+            const t1 = document.getElementById('adm_t1_'+id).value.trim();
+            const t2 = document.getElementById('adm_t2_'+id).value.trim();
             const r1 = document.getElementById('adm_r1_'+id).value;
             const r2 = document.getElementById('adm_r2_'+id).value;
 
@@ -1748,20 +1819,13 @@
             const token = sess.data.session?.access_token;
             if (!token) return alert("Sessão expirada. Refaça o login.");
 
-            // Teste: GET para ver se o token funciona
-            const getTest = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
-                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` }
-            });
-            console.log('GET Status:', getTest.status, 'GET Body:', await getTest.text());
-
-            // Teste: PATCH normal
+            const updateData = { time1: t1, time2: t2, res1: r1 !== '' ? parseInt(r1) : null, res2: r2 !== '' ? parseInt(r2) : null };
             const resp = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ res1: parseInt(r1), res2: parseInt(r2) })
+                body: JSON.stringify(updateData)
             });
             const respText = await resp.text();
-            console.log('PATCH Status:', resp.status, 'Resposta:', respText);
 
             if (!resp.ok) {
                 let err;
@@ -1770,7 +1834,7 @@
                 return;
             }
 
-            alert("Resultado salvo!");
+            alert("Jogo atualizado!");
             fecharAdmin();
             await carregarJogosEJogadores();
         }
