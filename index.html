@@ -311,6 +311,7 @@
                 <button class="btn-acao" style="padding:8px;font-size:0.8rem;margin:0;flex:1;" onclick="criarLiga()">➕ Criar Liga</button>
                 <button class="btn-acao" style="padding:8px;font-size:0.8rem;margin:0;flex:1;background:var(--secondary);color:var(--text);" onclick="entrarNaLiga()">🔗 Entrar com código</button>
             </div>
+            <button onclick="abrirPopupLigaInfo()" style="background:none;border:none;color:var(--primary);font-size:0.75rem;cursor:pointer;margin-top:4px;text-decoration:underline;">❓ Como funciona as ligas?</button>
             <div id="lista-minhas-ligas" style="margin-top:8px;"></div>
         </div>
 
@@ -352,6 +353,30 @@
         <hr class="menu-divisor">
 
         <button class="btn-logout" style="margin-top: 5px;" onclick="deslogar()">Sair do Aplicativo</button>
+    </div>
+
+    <div class="popup-notificacao" id="popup-liga-info">
+        <div class="popup-conteudo">
+            <button onclick="fecharPopupLigaInfo()" style="position: absolute; top: 12px; right: 15px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #888;">✖</button>
+            <h3 class="popup-titulo">🏆 Novidade: Ligas!</h3>
+            <div class="popup-texto" style="text-align:left;font-size:0.9rem;line-height:1.6;">
+                <p><strong>Crie sua própria liga</strong> e desafie seus amigos!</p>
+                <p>📋 <strong>Como funciona:</strong></p>
+                <ul style="padding-left:20px;margin:8px 0;">
+                    <li>Crie uma liga no menu 🏆 Ligas</li>
+                    <li>Compartilhe o <strong>código de 4 letras</strong> com seus amigos</li>
+                    <li>Eles entram com o código e já estão na liga!</li>
+                </ul>
+                <p>⚡ <strong>Pontuação da liga:</strong></p>
+                <ul style="padding-left:20px;margin:8px 0;">
+                    <li>Cada um começa com <strong>0 pontos</strong></li>
+                    <li>Só valem os palpites feitos <strong>depois de entrar</strong></li>
+                    <li>Acerto exato = 5 pts | Acertou vencedor = 3 pts</li>
+                </ul>
+                <p>🔄 <strong>Trocar ranking:</strong> Na tela principal, use as abas 📊 Geral e 🏆 Sua Liga para alternar!</p>
+            </div>
+            <button class="btn-acao" onclick="fecharPopupLigaInfo()">Entendi!</button>
+        </div>
     </div>
 
     <div class="popup-notificacao" id="popup-aviso">
@@ -592,6 +617,12 @@
             document.getElementById('popup-aviso').style.display = 'none';
         }
 
+        function abrirPopupLigaInfo() { document.getElementById('popup-liga-info').style.display = 'flex'; }
+        function fecharPopupLigaInfo() {
+            document.getElementById('popup-liga-info').style.display = 'none';
+            localStorage.setItem('liga_info_visto', 'true');
+        }
+
         async function salvarNovoNome() {
             const novoNome = document.getElementById('input-mudar-nome').value.trim();
             if (!novoNome) return alert("Digite um nome válido!");
@@ -711,6 +742,10 @@
             await carregarJogosEJogadores();
             await carregarPalpitesFiltro();
             await carregarMinhasLigas();
+
+            if (!localStorage.getItem('liga_info_visto')) {
+                setTimeout(abrirPopupLigaInfo, 1000);
+            }
 
             banco.channel('notificacoes')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacoes' }, (payload) => {
