@@ -1330,15 +1330,18 @@
         }
 
         async function calcularRankingLiga(perfis, palpites) {
-            const { data: membros } = await banco.from('liga_membros').select('usuario_id').eq('liga_id', ligaAtiva.id);
+            const { data: membros } = await banco.from('liga_membros').select('usuario_id, joined_at').eq('liga_id', ligaAtiva.id);
             if (!membros || membros.length === 0) return [];
-            const idsMembros = membros.map(m => m.usuario_id);
             const tabelaRanking = [];
-            perfis.filter(p => idsMembros.includes(p.id)).forEach(perfil => {
+            perfis.filter(p => membros.some(m => m.usuario_id === p.id)).forEach(perfil => {
+                const membro = membros.find(m => m.usuario_id === perfil.id);
+                const dataEntrada = new Date(membro.joined_at);
                 let pontosDoUsuario = 0;
                 const palpitesDoUsuario = palpites ? palpites.filter(p => p.usuario_id === perfil.id) : [];
                 jogos.forEach(jogo => {
                     if (jogo.res1 === null || jogo.res2 === null) return;
+                    const dataJogo = getDataJogo(jogo.data);
+                    if (dataJogo < dataEntrada) return;
                     const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
                     if (!palpite) return;
                     const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
