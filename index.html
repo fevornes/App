@@ -880,6 +880,7 @@
                 const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
                 const hoje = new Date();
                 const hojeDDMM = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`;
+                const ehMataMataHoje = hoje >= new Date(2026, 5, 28);
                 let diaAtivo = diasUnicos.find(d => d === hojeDDMM);
                 if (!diaAtivo) {
                     // Se não tem jogo hoje, pega o primeiro dia futuro mais próximo
@@ -960,7 +961,7 @@
                                     else if ((p1 > p2 && j.res1 > j.res2) || (p1 < p2 && j.res1 < j.res2) || (p1 === p2 && j.res1 === j.res2)) classeCard = 'acerto-vencedor';
                                     else classeCard = 'erro-total';
                                 }
-                                let infoLinha = `${fase} • ${j.data}`;
+                                let infoLinha = `${ehMataMataHoje ? '* ' : ''}${fase} • ${j.data}`;
                                 if (temResultado) infoLinha += ` | (Real: ${j.time1} ${j.res1} x ${j.res2} ${j.time2})`;
                                 const temPalpiteFase = p1Value !== '' && p2Value !== '';
                                 const ehFinalizadoFase = !jogosFinalizadosInicializado || jogosFinalizados.has(j.id);
@@ -990,6 +991,7 @@
                                 html += labelFase;
                                 html += '</div></div>';
                             });
+                            if (ehMataMataHoje) html += `<div style="font-size:0.7rem;color:#888;text-align:center;margin-top:5px;">* Em caso de prorrogação, vale o resultado dos 90 minutos</div>`;
                             document.getElementById('container-fase').innerHTML = html;
                             jogosFase.forEach(j => {
                                 const p1 = document.getElementById(`jogo_${j.id}_p1`);
