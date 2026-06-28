@@ -107,6 +107,9 @@
         }
         .time.mandante { justify-self: center; }
         .time.visitante { justify-self: center; }
+        .time-scorers { font-size: 0.65rem; color: #888; line-height: 1.2; margin-top: 2px; font-family: Arial, sans-serif; }
+        .time-scorers.left { text-align: left; }
+        .time-scorers.right { text-align: right; }
         
         input[type="number"] {
             width: 100%; height: 38px; text-align: center; font-size: 1.1rem;
@@ -731,8 +734,32 @@
                     const res1 = jogoBD.time1 === timeCasa ? gc : gf;
                     const res2 = jogoBD.time1 === timeCasa ? gf : gc;
                     if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
-                        await banco.from('jogos').update({ res1, res2 }).eq('id', jogoBD.id);
+                        const updateData = { res1, res2 };
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
+                        } catch (e) {}
+                        try {
+                            await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                        } catch (e) {
+                            delete updateData.home_scorers; delete updateData.away_scorers;
+                            await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                        }
                         atualizados++;
+                    } else {
+                        // Sync scorers even if score unchanged
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
+                            const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
+                            if ((hs || null) !== hsBD || (as || null) !== asBD) {
+                                try {
+                                    await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id);
+                                } catch (e) {}
+                            }
+                        } catch (e) {}
                     }
                 }
                 jogosFinalizadosInicializado = true;
@@ -743,6 +770,17 @@
         }
 
         const tipoParaFase = { r32: '16 Avos', r16: 'Oitavas', qf: 'Quartas', sf: 'Semifinais', third: 'Disputa de 3º Lugar', final: 'Final' };
+
+        function parseScorers(str) {
+            if (!str || str === 'null' || str === '[]') return [];
+            try { return JSON.parse(str); } catch (e) {}
+            const m = str.match(/"([^"]+)"/g);
+            return m ? m.map(s => s.replace(/"/g, '')) : [];
+        }
+        function formatScorers(str) {
+            const arr = parseScorers(str);
+            return arr.length ? arr.map(s => '⚽ ' + s).join(', ') : '';
+        }
 
         async function importarMataMata() {
             const el = document.getElementById('status-import');
@@ -785,10 +823,16 @@
                     const dataFormatada = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
                     const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
                     const novoId = (maxId?.[0]?.id || 0) + 1;
-                    const { error: errIns } = await banco.from('jogos').insert({
+                    const insertData = {
                         id: novoId, grupo, data: dataFormatada,
                         time1: timeCasa, time2: timeFora, res1: null, res2: null
-                    });
+                    };
+                    try {
+                        const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                        const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                        if (hs || as) { insertData.home_scorers = hs; insertData.away_scorers = as; }
+                    } catch (e) {}
+                    const { error: errIns } = await banco.from('jogos').insert(insertData);
                     if (errIns) { console.error('[ImportMM] Erro insert:', errIns, timeCasa, 'x', timeFora); continue; }
                     console.log('[ImportMM] Inserido:', novoId, grupo, timeCasa, 'x', timeFora, dataFormatada);
                     importados++;
@@ -815,8 +859,13 @@
                 // Limpar resultados de jogos que ainda não começaram
                 for (const j of jogos) {
                     if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
-                        await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
+                        try {
+                            await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null }).eq('id', j.id);
+                        } catch (e) {
+                            await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
+                        }
                         j.res1 = null; j.res2 = null;
+                        if (j.home_scorers !== undefined) { j.home_scorers = null; j.away_scorers = null; }
                     }
                 }
 
@@ -929,6 +978,13 @@
                                 html += `<span>X</span>`;
                                 html += `<input type="number" id="jogo_${j.id}_p2" min="0" value="${p2Value}" ${disabledAttr}>`;
                                 html += `<div class="time visitante">${j.time2}</div></div>`;
+                                const golsCasa = j.home_scorers ? formatScorers(j.home_scorers) : '';
+                                const golsFora = j.away_scorers ? formatScorers(j.away_scorers) : '';
+                                if (golsCasa || golsFora) {
+                                    html += `<div class="placar-container" style="margin-top:-4px;">`;
+                                    html += `<div class="time-scorers left">${golsCasa}</div><div></div><div></div><div></div><div class="time-scorers right">${golsFora}</div>`;
+                                    html += `</div>`;
+                                }
                                 html += `<div style="display:flex;justify-content:space-between;align-items:center;min-height:20px;">`;
                                 html += `<div>${btnLimparFase}</div>`;
                                 html += labelFase;
@@ -1037,6 +1093,12 @@
                                 <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}" ${disabledAttr}>
                                 <div class="time visitante">${jogo.time2}</div>
                             </div>
+                            ${(jogo.home_scorers || jogo.away_scorers) ? `
+                            <div class="placar-container" style="margin-top:-4px;">
+                                <div class="time-scorers left">${formatScorers(jogo.home_scorers)}</div>
+                                <div></div><div></div><div></div>
+                                <div class="time-scorers right">${formatScorers(jogo.away_scorers)}</div>
+                            </div>` : ''}
                             <div style="display:flex;justify-content:space-between;align-items:center;min-height:20px;">
                                 <div>${btnLimpar}</div>
                                 ${labelEncerrado}
@@ -1288,6 +1350,33 @@
             document.getElementById('popup-admin').style.display = 'none';
         }
 
+        async function adicionarColunasArtilheiros() {
+            const el = document.getElementById('status-artilheiros');
+            if (!el) return;
+            el.innerText = '🔄 Verificando...';
+            try {
+                const { data: teste } = await banco.from('jogos').select('home_scorers').limit(1);
+                if (teste && teste[0] && teste[0].hasOwnProperty('home_scorers')) {
+                    el.innerText = '✅ Colunas já existem!';
+                    return;
+                }
+            } catch (e) {}
+            const sql = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_scorers TEXT, ADD COLUMN IF NOT EXISTS away_scorers TEXT;`;
+            try {
+                const sess = await banco.auth.getSession();
+                const token = sess.data.session?.access_token;
+                if (token) {
+                    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ query: sql })
+                    });
+                    if (r.ok) { el.innerText = '✅ Colunas adicionadas!'; await carregarJogosEJogadores(); return; }
+                }
+            } catch (e) {}
+            el.innerHTML = `❌ Não foi possível adicionar automaticamente.<br><br>Copie e execute no <a href="https://supabase.com/dashboard/project/ixnqcwilmvgzkxfmkfaq/sql/new" target="_blank">SQL Editor do Supabase</a>:<br><br><code style="font-size:0.75rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
+        }
+
         function abrirAdmin() {
             if (usuarioAtual.email !== 'vornesfelipe@gmail.com') {
                 return alert("Acesso negado!");
@@ -1502,8 +1591,31 @@
                     const res2 = jogoBD.time1 === timeCasa ? gf : gc;
 
                     if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
-                        await banco.from('jogos').update({ res1, res2 }).eq('id', jogoBD.id);
+                        const updateData = { res1, res2 };
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
+                        } catch (e) {}
+                        try {
+                            await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                        } catch (e) {
+                            delete updateData.home_scorers; delete updateData.away_scorers;
+                            await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                        }
                         atualizados++;
+                    } else {
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
+                            const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
+                            if ((hs || null) !== hsBD || (as || null) !== asBD) {
+                                try {
+                                    await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id);
+                                } catch (e) {}
+                            }
+                        } catch (e) {}
                     }
                 }
 
@@ -1511,7 +1623,11 @@
                 if (todosApos) {
                     for (const j of todosApos) {
                         if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
-                            await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
+                            try {
+                                await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null }).eq('id', j.id);
+                            } catch (e) {
+                                await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
+                            }
                         }
                     }
                 }
@@ -2016,6 +2132,14 @@
                 <div style="margin-top:8px;">
                 <button onclick="importarMataMata()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📥 Importar jogos da API</button>
                 <div id="status-import" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">⚽ Artilheiros</summary>
+                <div style="margin-top:8px;">
+                <button onclick="adicionarColunasArtilheiros()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">➕ Adicionar colunas de artilheiros</button>
+                <div id="status-artilheiros" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
                 </div>
             </details>
 
