@@ -984,6 +984,7 @@
                 }
 
                 jogos.forEach(jogo => {
+                    if (!jogo.grupo.startsWith('Grupo')) return;
                     const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
                     const p1Value = palpite ? palpite.palpite_time1 : '';
                     const p2Value = palpite ? palpite.palpite_time2 : '';
