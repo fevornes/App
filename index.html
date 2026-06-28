@@ -225,6 +225,11 @@
         .stat-item { background: #f8f9fa; padding: 10px; border-radius: 8px; }
         .stat-valor { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
         .stat-label { font-size: 0.7rem; color: #888; }
+
+        .ranking-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+        .ranking-tab { flex: 1; padding: 6px 10px; border: 2px solid #ddd; border-radius: 8px; background: white; font-weight: bold; font-size: 0.8rem; cursor: pointer; text-align: center; color: #888; transition: all 0.2s; }
+        .ranking-tab.ativo { background: var(--primary); color: white; border-color: var(--primary); }
+        .liga-tag { display: inline-block; background: var(--secondary); color: var(--text); padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: bold; margin-left: 6px; }
     </style>
 </head>
 <body>
@@ -289,7 +294,6 @@
         <h3 style="margin-top: -10px; margin-bottom: 5px; color: var(--primary); font-size: 1.3rem;">⚙️ Menu</h3>
         
         <button class="btn-acao" style="background-color: var(--secondary); color: var(--text); padding: 10px; font-size: 0.95rem; margin-top: 0; margin-bottom: 5px;" onclick="abrirTutorialInstalacao()">📱 Instalar Aplicativo</button>
-        <button class="btn-acao" style="background-color: #666; color: white; padding: 8px; font-size: 0.8rem; margin-top: -8px;" onclick="atualizarApp()">🔄 Atualizar App</button>
 
         <hr class="menu-divisor">
         
@@ -297,6 +301,17 @@
             <p class="menu-section-title">👤 Alterar Perfil</p>
             <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
             <button class="btn-acao" style="padding: 10px; font-size: 0.9rem; margin-top: 0;" onclick="salvarNovoNome()">Atualizar Nome</button>
+        </div>
+
+        <hr class="menu-divisor">
+
+        <div class="menu-section">
+            <p class="menu-section-title">🏆 Ligas</p>
+            <div style="display:flex;gap:6px;">
+                <button class="btn-acao" style="padding:8px;font-size:0.8rem;margin:0;flex:1;" onclick="criarLiga()">➕ Criar Liga</button>
+                <button class="btn-acao" style="padding:8px;font-size:0.8rem;margin:0;flex:1;background:var(--secondary);color:var(--text);" onclick="entrarNaLiga()">🔗 Entrar com código</button>
+            </div>
+            <div id="lista-minhas-ligas" style="margin-top:8px;"></div>
         </div>
 
         <hr class="menu-divisor">
@@ -448,6 +463,9 @@
         let valoresTemporarios = {};
         let jogosFinalizados = new Set();
         let jogosFinalizadosInicializado = false;
+        let ligaAtiva = null;
+        let minhasLigas = [];
+        let rankingVisivel = 'geral';
 
         function jogoJaComecou(dataStr) {
             return new Date() >= getDataJogo(dataStr);
@@ -547,6 +565,22 @@
         function abrirMenu() {
             document.getElementById('menu-overlay').style.display = 'block';
             setTimeout(() => { document.getElementById('menu-lateral').classList.add('aberto'); }, 10);
+            renderizarMinhasLigasMenu();
+        }
+
+        function renderizarMinhasLigasMenu() {
+            const container = document.getElementById('lista-minhas-ligas');
+            if (!container) return;
+            if (minhasLigas.length === 0) {
+                container.innerHTML = '<div style="font-size:0.75rem;color:#888;text-align:center;padding:4px;">Nenhuma liga ainda</div>';
+                return;
+            }
+            container.innerHTML = minhasLigas.map(l => `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;font-size:0.8rem;">
+                    <span><strong>${l.nome}</strong> <span style="color:#888;font-size:0.7rem;">${l.codigo}</span></span>
+                    <button onclick="sairDaLiga('${l.id}')" style="background:none;border:none;color:#d93025;font-size:0.7rem;cursor:pointer;">Sair</button>
+                </div>
+            `).join('');
         }
 
         function fecharMenu() {
@@ -664,8 +698,9 @@
             document.getElementById('cadastro-secao').style.display = 'none';
             document.getElementById('jogo-secao').style.display = 'block';
             
-            const { data } = await banco.from('perfis').select('nome').eq('id', usuarioAtual.id).single();
+            const { data } = await banco.from('perfis').select('nome, pontos_bonus').eq('id', usuarioAtual.id).single();
             document.getElementById('usuario-saudacao').innerText = `Olá, ${data ? data.nome : 'Jogador'}!`;
+            if (data && data.pontos_bonus) usuarioAtual.pontos_bonus = data.pontos_bonus;
 
             if (usuarioAtual.user_metadata?.tutorial_visto === false) {
                 passoOnboarding = 1;
@@ -675,6 +710,7 @@
 
             await carregarJogosEJogadores();
             await carregarPalpitesFiltro();
+            await carregarMinhasLigas();
 
             banco.channel('notificacoes')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacoes' }, (payload) => {
@@ -1191,33 +1227,37 @@
         }
 
         async function calcularEAtualizarRankingGeral() {
-            const { data: todosPerfis } = await banco.from('perfis').select('id, nome');
+            const { data: todosPerfis } = await banco.from('perfis').select('id, nome, pontos_bonus');
             const { data: todosPalpites } = await banco.from('palpites').select('*');
 
             if (!todosPerfis) return;
 
-            const tabelaRanking = [];
+            let tabelaRanking = [];
 
-            todosPerfis.forEach(perfil => {
-                let pontosDoUsuario = 0;
-                const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
+            if (ligaAtiva) {
+                tabelaRanking = await calcularRankingLiga(todosPerfis, todosPalpites);
+            } else {
+                todosPerfis.forEach(perfil => {
+                    let pontosDoUsuario = 0;
+                    const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
 
-                jogos.forEach(jogo => {
-                    if (jogo.res1 === null || jogo.res2 === null) return;
-                    const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
-                    if (!palpite) return;
+                    jogos.forEach(jogo => {
+                        if (jogo.res1 === null || jogo.res2 === null) return;
+                        const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
+                        if (!palpite) return;
 
-                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                    const r1 = jogo.res1, r2 = jogo.res2;
+                        const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                        const r1 = jogo.res1, r2 = jogo.res2;
 
-                    if (p1 === r1 && p2 === r2) { pontosDoUsuario += 5; } 
-                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { pontosDoUsuario += 3; }
+                        if (p1 === r1 && p2 === r2) { pontosDoUsuario += 5; } 
+                        else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { pontosDoUsuario += 3; }
+                    });
+
+                    pontosDoUsuario += perfil.pontos_bonus || 0;
+                    tabelaRanking.push({ nome: perfil.nome, pontos: pontosDoUsuario, id: perfil.id });
                 });
-
-                tabelaRanking.push({ nome: perfil.nome, pontos: pontosDoUsuario, id: perfil.id });
-            });
-
-            tabelaRanking.sort((a, b) => b.pontos - a.pontos);
+                tabelaRanking.sort((a, b) => b.pontos - a.pontos);
+            }
 
             const divRanking = document.getElementById('tabela-ranking');
             divRanking.innerHTML = '';
@@ -1244,6 +1284,150 @@
                     </div>
                 `;
             }
+            renderizarTabsRanking();
+        }
+
+        // --- Liga functions ---
+        async function carregarMinhasLigas() {
+            if (!usuarioAtual) return;
+            const { data: membro } = await banco.from('liga_membros').select('liga_id, ligas(id, nome, codigo)').eq('usuario_id', usuarioAtual.id);
+            minhasLigas = membro ? membro.map(m => m.ligas) : [];
+            renderizarTabsRanking();
+        }
+
+        function renderizarTabsRanking() {
+            const container = document.querySelector('.ranking-container');
+            if (!container) return;
+            const header = container.querySelector('div');
+            if (!header) return;
+            let tabsDiv = document.getElementById('ranking-tabs');
+            if (!tabsDiv) {
+                tabsDiv = document.createElement('div');
+                tabsDiv.id = 'ranking-tabs';
+                tabsDiv.className = 'ranking-tabs';
+                header.after(tabsDiv);
+            }
+            let html = `<div class="ranking-tab ${rankingVisivel === 'geral' ? 'ativo' : ''}" onclick="mudarRanking('geral')">📊 Geral</div>`;
+            minhasLigas.forEach(liga => {
+                const isAtivo = rankingVisivel === 'liga_' + liga.id;
+                html += `<div class="ranking-tab ${isAtivo ? 'ativo' : ''}" onclick="mudarRanking('liga_${liga.id}')">🏆 ${liga.nome}</div>`;
+            });
+            tabsDiv.innerHTML = html;
+        }
+
+        async function mudarRanking(tipo) {
+            rankingVisivel = tipo;
+            if (tipo === 'geral') {
+                ligaAtiva = null;
+                document.querySelector('.ranking-titulo').innerHTML = '📊 Classificação Geral';
+            } else {
+                const ligaId = tipo.replace('liga_', '');
+                ligaAtiva = minhasLigas.find(l => l.id === ligaId);
+                document.querySelector('.ranking-titulo').innerHTML = `🏆 ${ligaAtiva.nome} <span class="liga-tag">${ligaAtiva.codigo}</span>`;
+            }
+            renderizarTabsRanking();
+            await calcularEAtualizarRankingGeral();
+        }
+
+        async function calcularRankingLiga(perfis, palpites) {
+            const { data: membros } = await banco.from('liga_membros').select('usuario_id').eq('liga_id', ligaAtiva.id);
+            if (!membros || membros.length === 0) return [];
+            const idsMembros = membros.map(m => m.usuario_id);
+            const tabelaRanking = [];
+            perfis.filter(p => idsMembros.includes(p.id)).forEach(perfil => {
+                let pontosDoUsuario = 0;
+                const palpitesDoUsuario = palpites ? palpites.filter(p => p.usuario_id === perfil.id) : [];
+                jogos.forEach(jogo => {
+                    if (jogo.res1 === null || jogo.res2 === null) return;
+                    const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
+                    if (!palpite) return;
+                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                    const r1 = jogo.res1, r2 = jogo.res2;
+                    if (p1 === r1 && p2 === r2) pontosDoUsuario += 5;
+                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontosDoUsuario += 3;
+                });
+                tabelaRanking.push({ nome: perfil.nome, pontos: pontosDoUsuario, id: perfil.id });
+            });
+            return tabelaRanking.sort((a, b) => b.pontos - a.pontos);
+        }
+
+        function gerarCodigoLiga() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let codigo = '';
+            for (let i = 0; i < 4; i++) codigo += chars[Math.floor(Math.random() * chars.length)];
+            return codigo;
+        }
+
+        async function criarLiga() {
+            const nome = prompt("Nome da liga:");
+            if (!nome || !nome.trim()) return;
+            const codigo = gerarCodigoLiga();
+            const { data, error } = await banco.from('ligas').insert({ nome: nome.trim(), codigo, criador_id: usuarioAtual.id }).select().single();
+            if (error) { alert("Erro ao criar liga: " + error.message + "\n\nExecute no SQL Editor:\n" + getSQLLigas()); return; }
+            await banco.from('liga_membros').insert({ liga_id: data.id, usuario_id: usuarioAtual.id });
+            alert(`Liga "${nome}" criada!\nCódigo: ${codigo}\nCompartilhe o código para outros entrarem.`);
+            await carregarMinhasLigas();
+        }
+
+        async function entrarNaLiga() {
+            const codigo = prompt("Digite o código da liga (4 caracteres):");
+            if (!codigo || !codigo.trim()) return;
+            const { data: liga } = await banco.from('ligas').select('id, nome, codigo').eq('codigo', codigo.trim().toUpperCase()).single();
+            if (!liga) return alert("Liga não encontrada! Verifique o código.");
+            const { data: jaExiste } = await banco.from('liga_membros').select('id').eq('liga_id', liga.id).eq('usuario_id', usuarioAtual.id).single();
+            if (jaExiste) return alert("Você já está nesta liga!");
+            const { error } = await banco.from('liga_membros').insert({ liga_id: liga.id, usuario_id: usuarioAtual.id });
+            if (error) { alert("Erro ao entrar na liga: " + error.message + "\n\nExecute no SQL Editor:\n" + getSQLLigas()); return; }
+            alert(`Você entrou na liga "${liga.nome}"!`);
+            await carregarMinhasLigas();
+        }
+
+        async function sairDaLiga(ligaId) {
+            if (!confirm("Tem certeza que deseja sair desta liga?")) return;
+            await banco.from('liga_membros').delete().eq('liga_id', ligaId).eq('usuario_id', usuarioAtual.id);
+            if (ligaAtiva && ligaAtiva.id === ligaId) {
+                rankingVisivel = 'geral';
+                ligaAtiva = null;
+            }
+            await carregarMinhasLigas();
+            await calcularEAtualizarRankingGeral();
+        }
+
+        function getSQLLigas() {
+            return `CREATE TABLE IF NOT EXISTS ligas (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                nome TEXT NOT NULL,
+                codigo TEXT UNIQUE NOT NULL,
+                criador_id UUID REFERENCES auth.users(id),
+                created_at TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE TABLE IF NOT EXISTS liga_membros (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                liga_id UUID REFERENCES ligas(id) ON DELETE CASCADE,
+                usuario_id UUID REFERENCES auth.users(id),
+                joined_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(liga_id, usuario_id)
+            );`;
+        }
+
+        async function criarTabelasLigas() {
+            const el = document.getElementById('status-ligas');
+            if (!el) return;
+            el.innerText = '🔄 Criando tabelas...';
+            const sql = getSQLLigas();
+            try {
+                const sess = await banco.auth.getSession();
+                const token = sess.data.session?.access_token;
+                if (token) {
+                    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ query: sql })
+                    });
+                    if (r.ok) { el.innerText = '✅ Tabelas criadas!'; return; }
+                }
+            } catch (e) {}
+            el.innerHTML = `❌ Execute no <a href="https://supabase.com/dashboard/project/ixnqcwilmvgzkxfmkfaq/sql/new" target="_blank">SQL Editor do Supabase</a>:<br><br><code style="font-size:0.7rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
         }
 
         function abrirPopupFiltros() {
@@ -1377,6 +1561,63 @@
                 }
             } catch (e) {}
             el.innerHTML = `❌ Não foi possível adicionar automaticamente.<br><br>Copie e execute no <a href="https://supabase.com/dashboard/project/ixnqcwilmvgzkxfmkfaq/sql/new" target="_blank">SQL Editor do Supabase</a>:<br><br><code style="font-size:0.75rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
+        }
+
+        async function abrirEdicaoPontos() {
+            const container = document.getElementById('lista-usuarios-pontos');
+            if (!container) return;
+            container.innerHTML = '🔄 Carregando...';
+            const { data: perfis } = await banco.from('perfis').select('id, nome, pontos_bonus');
+            if (!perfis || perfis.length === 0) { container.innerHTML = 'Nenhum usuário encontrado.'; return; }
+
+            const { data: todosPalpites } = await banco.from('palpites').select('*');
+
+            container.innerHTML = '';
+            perfis.forEach(perfil => {
+                let pontos = 0;
+                const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
+                jogos.forEach(jogo => {
+                    if (jogo.res1 === null || jogo.res2 === null) return;
+                    const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
+                    if (!palpite) return;
+                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                    const r1 = jogo.res1, r2 = jogo.res2;
+                    if (p1 === r1 && p2 === r2) pontos += 5;
+                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontos += 3;
+                });
+                const bonus = perfil.pontos_bonus || 0;
+                const total = pontos + bonus;
+                container.innerHTML += `
+                    <div style="padding:8px 0;border-bottom:1px solid #eee;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="flex:1;font-size:0.85rem;"><strong>${perfil.nome}</strong> — ${total} pts <span style="color:#888;font-size:0.75rem;">(base: ${pontos} + bônus: ${bonus})</span></span>
+                        </div>
+                        <div style="display:flex;gap:4px;margin-top:4px;">
+                            <input type="number" id="pontos_${perfil.id}" placeholder="+5 ou -3" style="width:80px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                            <button onclick="salvarPontosUsuario('${perfil.id}')" style="padding:4px 10px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;font-weight:bold;">Aplicar</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function salvarPontosUsuario(userId) {
+            const input = document.getElementById('pontos_' + userId);
+            if (!input) return;
+            const valor = parseInt(input.value);
+            if (isNaN(valor)) return alert("Digite um número! (ex: +5 ou -3)");
+            try {
+                const { data: perfil } = await banco.from('perfis').select('pontos_bonus').eq('id', userId).single();
+                const bonusAtual = (perfil && perfil.pontos_bonus) || 0;
+                const novoBonus = bonusAtual + valor;
+                const { error } = await banco.from('perfis').update({ pontos_bonus: novoBonus }).eq('id', userId);
+                if (error) throw error;
+                alert(`Bônus atualizado: ${bonusAtual} → ${novoBonus} (${valor >= 0 ? '+' : ''}${valor})`);
+                input.value = '';
+                await abrirEdicaoPontos();
+            } catch (e) {
+                alert("Erro: " + e.message + "\n\nExecute no SQL Editor:\nALTER TABLE perfis ADD COLUMN IF NOT EXISTS pontos_bonus INTEGER DEFAULT 0;");
+            }
         }
 
         function abrirAdmin() {
@@ -1751,7 +1992,7 @@
         async function verTodosPalpites() {
             const div = document.getElementById('lista-palpites-admin');
             div.innerHTML = 'Carregando...';
-            const { data: perfis } = await banco.from('perfis').select('id, nome');
+            const { data: perfis } = await banco.from('perfis').select('id, nome, pontos_bonus');
             const { data: todosPalpites } = await banco.from('palpites').select('*');
             if (!perfis || !todosPalpites) { div.innerHTML = 'Erro ao carregar.'; return; }
 
@@ -1784,9 +2025,11 @@
                         <span style="color:#999;font-size:0.7rem;"> ${rotuloJogo(jogo)}</span>
                     </div>`;
                 });
-
+                const bonus = perfil.pontos_bonus || 0;
+                const totalFinal = pontos + bonus;
+                const bonusStr = bonus > 0 ? ` <span style="color:#28a745;">(+${bonus} bônus)</span>` : '';
                 html += `<details style="margin-bottom:6px;font-size:0.85rem;">
-                    <summary style="cursor:pointer;font-weight:bold;padding:4px 0;"><strong>${perfil.nome}</strong> — ${pontos} pts</summary>
+                    <summary style="cursor:pointer;font-weight:bold;padding:4px 0;"><strong>${perfil.nome}</strong> — ${totalFinal} pts${bonusStr}</summary>
                     ${detalhes}
                 </details>`;
             }
@@ -1818,6 +2061,7 @@
                 else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { totalAcertos++; totalPontos += 3; }
                 else { totalErros++; }
             });
+            if (usuarioAtual && usuarioAtual.pontos_bonus) totalPontos += usuarioAtual.pontos_bonus;
             const aproveitamento = totalJogos > 0 ? ((totalPontos / (totalJogos * 5)) * 100).toFixed(1) : '0';
             return { totalCravadas, totalAcertos, totalErros, totalPontos, totalJogos, aproveitamento };
         }
@@ -2164,6 +2408,22 @@
                 <summary style="cursor:pointer;color:#888;font-weight:bold;">🔔 Notificar todos</summary>
                 <div style="margin-top:8px;">
                 <button onclick="notificarTodos()" style="width:100%;padding:8px;background:var(--secondary);color:var(--text);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">🔔 Notificar todos sobre resultados</button>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">✏️ Editar Pontos</summary>
+                <div style="margin-top:8px;">
+                <button onclick="abrirEdicaoPontos()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📋 Carregar usuários</button>
+                <div id="lista-usuarios-pontos" style="margin-top:8px;max-height:300px;overflow-y:auto;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">🏆 Ligas</summary>
+                <div style="margin-top:8px;">
+                <button onclick="criarTabelasLigas()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">➕ Criar tabelas de ligas</button>
+                <div id="status-ligas" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
                 </div>
             </details>
 
