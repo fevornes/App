@@ -871,25 +871,40 @@
                 if (!resp.ok) { console.error('[ImportMM] API status:', resp.status); return 0; }
                 const data = await resp.json();
                 const matches = data.games || [];
-                console.log('[ImportMM] Total jogos da API:', matches.length);
                 const knockouts = matches.filter(m => tipoParaFase[m.type]);
                 console.log('[ImportMM] Jogos mata-mata:', knockouts.length);
                 const comTimes = knockouts.filter(m => m.home_team_name_en && m.away_team_name_en && m.home_team_name_en !== '' && m.away_team_name_en !== '');
                 console.log('[ImportMM] Com times:', comTimes.length);
-                comTimes.forEach(m => console.log(`  ${m.type}: ${m.home_team_name_en} vs ${m.away_team_name_en}`));
                 const { data: existentes, error: errEx } = await banco.from('jogos').select('id, time1, time2, grupo');
                 if (errEx) { console.error('[ImportMM] Erro select:', errEx); return 0; }
                 let importados = 0;
                 for (const match of comTimes) {
                     const timeCasa = en2pt[match.home_team_name_en] || match.home_team_name_en;
                     const timeFora = en2pt[match.away_team_name_en] || match.away_team_name_en;
-                    if (!timeCasa || !timeFora) { console.log('[ImportMM] Sem tradução:', match.home_team_name_en, match.away_team_name_en); continue; }
+                    if (!timeCasa || !timeFora) continue;
                     const grupo = tipoParaFase[match.type];
+
                     const jaExiste = existentes?.find(j =>
                         ((j.time1 === timeCasa && j.time2 === timeFora) || (j.time1 === timeFora && j.time2 === timeCasa)) &&
                         j.grupo === grupo
                     );
                     if (jaExiste) { console.log('[ImportMM] Já existe:', timeCasa, 'x', timeFora, grupo); continue; }
+
+                    const placeholder = existentes?.find(j =>
+                        j.grupo === grupo && (j.time1 === 'A definir' || j.time2 === 'A definir' || j.time1.includes('Winner') || j.time2.includes('Winner') || j.time1.includes('Vencedor') || j.time2.includes('Vencedor'))
+                    );
+                    if (placeholder) {
+                        const updateFields = {};
+                        if (placeholder.time1 === 'A definir' || placeholder.time1.includes('Winner') || placeholder.time1.includes('Vencedor')) updateFields.time1 = timeCasa;
+                        if (placeholder.time2 === 'A definir' || placeholder.time2.includes('Winner') || placeholder.time2.includes('Vencedor')) updateFields.time2 = timeFora;
+                        if (Object.keys(updateFields).length > 0) {
+                            await banco.from('jogos').update(updateFields).eq('id', placeholder.id);
+                            console.log('[ImportMM] Atualizado placeholder:', placeholder.id, updateFields);
+                            importados++;
+                        }
+                        continue;
+                    }
+
                     const partes = match.local_date.split(' ');
                     const dataFormatada = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
                     const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
@@ -904,11 +919,11 @@
                         if (hs || as) { insertData.home_scorers = hs; insertData.away_scorers = as; }
                     } catch (e) {}
                     const { error: errIns } = await banco.from('jogos').insert(insertData);
-                    if (errIns) { console.error('[ImportMM] Erro insert:', errIns, timeCasa, 'x', timeFora); continue; }
+                    if (errIns) { console.error('[ImportMM] Erro insert:', errIns); continue; }
                     console.log('[ImportMM] Inserido:', novoId, grupo, timeCasa, 'x', timeFora, dataFormatada);
                     importados++;
                 }
-                console.log('[ImportMM] Total importados:', importados);
+                console.log('[ImportMM] Total importados/atualizados:', importados);
                 return importados;
             } catch (e) { console.error('[ImportMM] Erro:', e);
                 const el = document.getElementById('status-import');
@@ -1989,37 +2004,34 @@
 
         async function corrigir16Avos() {
             const el = document.getElementById('status-corrigir');
-            if (!confirm("Isso vai DELETAR todos os jogos de 16 Avos e recriar com os dados corretos. Continuar?")) return;
-            el.innerText = '🔄 Deletando jogos antigos...';
+            if (!confirm("Isso vai DELETAR todos os jogos de 16 Avos e recriar com os dados da API. Continuar?")) return;
+            el.innerText = '🔄 Buscando jogos da API...';
             try {
+                const resp = await fetch('https://worldcup26.ir/get/games');
+                if (!resp.ok) throw new Error('Erro API ' + resp.status);
+                const data = await resp.json();
+                const r32 = data.games.filter(m => m.type === 'r32');
+
                 const { error: errDel } = await banco.from('jogos').delete().eq('grupo', '16 Avos');
                 if (errDel) throw errDel;
 
                 const { data: maxIdData } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
                 let novoId = (maxIdData?.[0]?.id || 0) + 1;
 
-                const jogosCorretos = [
-                    { time1: 'África do Sul', time2: 'Canadá', data: '28/06 - 16:00' },
-                    { time1: 'Brasil', time2: 'Japão', data: '29/06 - 14:00' },
-                    { time1: 'Alemanha', time2: 'Paraguai', data: '29/06 - 17:30' },
-                    { time1: 'Holanda', time2: 'Marrocos', data: '29/06 - 22:00' },
-                    { time1: 'França', time2: 'Suécia', data: '30/06 - 18:00' },
-                    { time1: 'Costa do Marfim', time2: 'Noruega', data: '30/06 - 14:00' },
-                    { time1: 'Estados Unidos', time2: 'Bósnia e Herzegovina', data: '01/07 - 21:00' },
-                    { time1: 'Austrália', time2: 'Egito', data: '03/07 - 15:00' },
-                    { time1: 'Argentina', time2: 'Cabo Verde', data: '03/07 - 19:00' }
-                ];
-
-                el.innerText = `🔄 Inserindo ${jogosCorretos.length} jogos...`;
-                for (const j of jogosCorretos) {
+                let inseridos = 0;
+                for (const match of r32) {
+                    const timeCasa = match.home_team_name_en ? (en2pt[match.home_team_name_en] || match.home_team_name_en) : null;
+                    const timeFora = match.away_team_name_en ? (en2pt[match.away_team_name_en] || match.away_team_name_en) : null;
+                    const partes = match.local_date.split(' ');
+                    const dataFormatada = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
                     const { error } = await banco.from('jogos').insert({
-                        id: novoId++, grupo: '16 Avos', data: j.data,
-                        time1: j.time1, time2: j.time2, res1: null, res2: null
+                        id: novoId++, grupo: '16 Avos', data: dataFormatada,
+                        time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null
                     });
-                    if (error) console.error('Erro insert:', error);
+                    if (!error) inseridos++;
                 }
 
-                el.innerText = `✅ ${jogosCorretos.length} jogos de 16 Avos corrigidos!`;
+                el.innerText = `✅ ${inseridos} jogos de 16 Avos criados!`;
                 await carregarJogosEJogadores();
             } catch (e) {
                 el.innerText = '❌ Erro: ' + e.message;
