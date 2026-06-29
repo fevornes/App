@@ -865,8 +865,48 @@
             return h;
         })();
 
-        function getDataBrasilia(time1, time2, apiData) {
-            return horariosBrasilia[time1+'|'+time2] || apiData;
+        const stadiumOffset = {
+            1: { city: "New York", utcOffset: -4 },
+            2: { city: "Los Angeles", utcOffset: -7 },
+            3: { city: "Dallas", utcOffset: -5 },
+            4: { city: "Miami", utcOffset: -4 },
+            5: { city: "Atlanta", utcOffset: -4 },
+            6: { city: "Seattle", utcOffset: -7 },
+            7: { city: "Houston", utcOffset: -5 },
+            8: { city: "Kansas City", utcOffset: -5 },
+            9: { city: "Boston", utcOffset: -4 },
+            10: { city: "Philadelphia", utcOffset: -4 },
+            11: { city: "San Francisco", utcOffset: -7 },
+            12: { city: "Guadalajara", utcOffset: -6 },
+            13: { city: "Monterrey", utcOffset: -6 },
+            14: { city: "Mexico City", utcOffset: -6 },
+            15: { city: "Toronto", utcOffset: -4 },
+            16: { city: "Vancouver", utcOffset: -7 }
+        };
+
+        function converterStadiumParaBrasilia(match) {
+            if (!match || !match.local_date) return null;
+            const offset = match.stadium_id ? stadiumOffset[match.stadium_id] : null;
+            if (!offset) return null;
+            const [datePart, timePart] = match.local_date.split(' ');
+            if (!datePart || !timePart) return null;
+            const [month, day, year] = datePart.split('/');
+            const [hour, minute] = timePart.split(':');
+            const localUtc = Date.UTC(+year, +month - 1, +day, +hour - offset.utcOffset, +minute);
+            const brasilia = new Date(localUtc - 3 * 3600000);
+            return `${String(brasilia.getUTCDate()).padStart(2,'0')}/${String(brasilia.getUTCMonth() + 1).padStart(2,'0')} - ${String(brasilia.getUTCHours()).padStart(2,'0')}:${String(brasilia.getUTCMinutes()).padStart(2,'0')}`;
+        }
+
+        function getDataBrasilia(time1, time2, apiData, match) {
+            if (time1 && time2) {
+                const h = horariosBrasilia[time1+'|'+time2];
+                if (h) return h;
+            }
+            if (match) {
+                const s = converterStadiumParaBrasilia(match);
+                if (s) return s;
+            }
+            return apiData;
         }
 
         function parseScorers(str) {
@@ -917,7 +957,7 @@
                         );
                         if (exato) {
                             await atualizarResultadoSePrecisar(exato, match, timeCasa, timeFora);
-                            await corrigirDataSePrecisar(exato, timeCasa, timeFora);
+                            await corrigirDataSePrecisar(exato, timeCasa, timeFora, match);
                             continue;
                         }
                     }
@@ -965,7 +1005,7 @@
                         }
                         const t1corrigido = timeCasa || achado.time1;
                         const t2corrigido = timeFora || achado.time2;
-                        if (t1corrigido && t2corrigido) await corrigirDataSePrecisar(achado, t1corrigido, t2corrigido);
+                        if (t1corrigido && t2corrigido) await corrigirDataSePrecisar(achado, t1corrigido, t2corrigido, match);
                         continue;
                     }
 
@@ -973,7 +1013,7 @@
                     if (jogosNoGrupo.length === 0 || (timeCasa && timeFora)) {
                         const partes = match.local_date.split(' ');
                         const dataApi = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
-                        const dataFormatada = (timeCasa && timeFora) ? getDataBrasilia(timeCasa, timeFora, dataApi) : dataApi;
+                        const dataFormatada = getDataBrasilia(timeCasa, timeFora, dataApi, match);
                         const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
                         const novoId = (maxId?.[0]?.id || 0) + 1;
                         const insertData = { id: novoId, grupo, data: dataFormatada, time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null };
@@ -996,8 +1036,8 @@
                 return 0; }
         }
 
-        async function corrigirDataSePrecisar(jogoBD, t1, t2) {
-            const correta = getDataBrasilia(t1, t2, null);
+        async function corrigirDataSePrecisar(jogoBD, t1, t2, match) {
+            const correta = getDataBrasilia(t1, t2, null, match);
             if (correta && jogoBD.data !== correta) {
                 await banco.from('jogos').update({ data: correta }).eq('id', jogoBD.id);
                 console.log('[ImportMM] Data corrigida:', jogoBD.id, jogoBD.data, '→', correta);
@@ -1487,6 +1527,9 @@
         async function calcularRankingLiga(perfis, palpites) {
             const { data: membros } = await banco.from('liga_membros').select('usuario_id, joined_at').eq('liga_id', ligaAtiva.id);
             if (!membros || membros.length === 0) return [];
+            const { data: ajustes } = await banco.from('league_score_adjustments').select('usuario_id, pontos').eq('liga_id', ligaAtiva.id);
+            const ajustesPorUser = {};
+            if (ajustes) ajustes.forEach(a => { ajustesPorUser[a.usuario_id] = (ajustesPorUser[a.usuario_id] || 0) + a.pontos; });
             const tabelaRanking = [];
             perfis.filter(p => membros.some(m => m.usuario_id === p.id)).forEach(perfil => {
                 const membro = membros.find(m => m.usuario_id === perfil.id);
@@ -1504,6 +1547,7 @@
                     if (p1 === r1 && p2 === r2) pontosDoUsuario += 5;
                     else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontosDoUsuario += 3;
                 });
+                pontosDoUsuario += ajustesPorUser[perfil.id] || 0;
                 tabelaRanking.push({ nome: perfil.nome, pontos: pontosDoUsuario, id: perfil.id });
             });
             return tabelaRanking.sort((a, b) => b.pontos - a.pontos);
@@ -1565,6 +1609,14 @@
                 usuario_id UUID REFERENCES auth.users(id),
                 joined_at TIMESTAMPTZ DEFAULT now(),
                 UNIQUE(liga_id, usuario_id)
+            );
+            CREATE TABLE IF NOT EXISTS league_score_adjustments (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                liga_id UUID REFERENCES ligas(id) ON DELETE CASCADE,
+                usuario_id UUID REFERENCES auth.users(id),
+                pontos INTEGER NOT NULL,
+                justificativa TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT now()
             );`;
         }
 
@@ -1586,6 +1638,140 @@
                 }
             } catch (e) {}
             el.innerHTML = `❌ Execute no <a href="https://supabase.com/dashboard/project/ixnqcwilmvgzkxfmkfaq/sql/new" target="_blank">SQL Editor do Supabase</a>:<br><br><code style="font-size:0.7rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
+        }
+
+        async function criarTabelaAjustes() {
+            const el = document.getElementById('status-ajustes');
+            if (!el) return;
+            el.innerText = '🔄 Criando tabela...';
+            const sql = "CREATE TABLE IF NOT EXISTS league_score_adjustments (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, liga_id UUID REFERENCES ligas(id) ON DELETE CASCADE, usuario_id UUID REFERENCES auth.users(id), pontos INTEGER NOT NULL, justificativa TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now()); ALTER TABLE league_score_adjustments DISABLE ROW LEVEL SECURITY;";
+            try {
+                const sess = await banco.auth.getSession();
+                const token = sess.data.session?.access_token;
+                if (token) {
+                    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ query: sql })
+                    });
+                    if (r.ok) { el.innerText = '✅ Tabela criada!'; return; }
+                }
+            } catch (e) {}
+            el.innerHTML = `❌ Execute no SQL Editor:<br><br><code style="font-size:0.7rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
+        }
+
+        async function carregarLigasParaAjuste() {
+            const el = document.getElementById('lista-ajustes');
+            if (!el) return;
+            el.innerHTML = 'Carregando...';
+            const { data: ligas } = await banco.from('ligas').select('id, nome, codigo');
+            const { data: perfis } = await banco.from('perfis').select('id, nome');
+            const { data: membros } = await banco.from('liga_membros').select('liga_id, usuario_id');
+            const { data: ajustes } = await banco.from('league_score_adjustments').select('usuario_id, liga_id, pontos');
+            if (!ligas || !perfis || !membros) { el.innerHTML = '<div style="color:#888;">Erro ao carregar dados.</div>'; return; }
+            const nomePorId = {}; perfis.forEach(p => { nomePorId[p.id] = p.nome; });
+            const ajustesPorUserLiga = {};
+            if (ajustes) ajustes.forEach(a => { const k = a.usuario_id+'|'+a.liga_id; ajustesPorUserLiga[k] = (ajustesPorUserLiga[k] || 0) + a.pontos; });
+            let html = '';
+            for (const liga of ligas) {
+                const membrosDaLiga = membros.filter(m => m.liga_id === liga.id);
+                if (membrosDaLiga.length === 0) continue;
+                html += `<div style="font-weight:bold;font-size:0.85rem;color:var(--primary);margin:10px 0 4px;">🏆 ${liga.nome} (${liga.codigo})</div>`;
+                membrosDaLiga.forEach(m => {
+                    const nome = nomePorId[m.usuario_id] || 'Desconhecido';
+                    const k = m.usuario_id+'|'+liga.id;
+                    const totalAjuste = ajustesPorUserLiga[k] || 0;
+                    const ajusteStr = totalAjuste !== 0 ? ` <span style="color:${totalAjuste > 0 ? '#28a745' : '#d93025'};">(${totalAjuste > 0 ? '+' : ''}${totalAjuste})</span>` : '';
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #eee;font-size:0.8rem;">
+                        <span>${nome}${ajusteStr}</span>
+                        <button onclick="abrirModalAjuste('${m.usuario_id}','${liga.id}','${nome.replace(/'/g, "\\'")}','${liga.nome.replace(/'/g, "\\'")}')" style="padding:4px 8px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;">⚖️ Ajustar</button>
+                    </div>`;
+                });
+            }
+            el.innerHTML = html || '<div style="color:#888;">Nenhum membro em ligas.</div>';
+        }
+
+        function abrirModalAjuste(usuarioId, ligaId, nomeUsuario, nomeLiga) {
+            document.getElementById('conteudo-ajuste').innerHTML = `
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:0.9rem;margin-bottom:4px;"><strong>Usuário:</strong> ${nomeUsuario}</div>
+                    <div style="font-size:0.9rem;margin-bottom:4px;"><strong>Liga:</strong> ${nomeLiga}</div>
+                    <div style="font-size:0.9rem;margin-bottom:12px;"><strong>Pontos atuais na liga:</strong> <span id="pontos-atuais-ajuste">calculando...</span></div>
+                    <label style="font-size:0.85rem;font-weight:bold;display:block;margin-bottom:4px;">Pontos (+ ou -):</label>
+                    <input type="number" id="campo-pontos-ajuste" value="0" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;box-sizing:border-box;margin-bottom:10px;">
+                    <label style="font-size:0.85rem;font-weight:bold;display:block;margin-bottom:4px;">Justificativa (obrigatória):</label>
+                    <textarea id="campo-justificativa-ajuste" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;box-sizing:border-box;margin-bottom:12px;min-height:60px;resize:vertical;" placeholder="Ex: Entrou na liga durante o jogo, pontuação deve ser válida"></textarea>
+                    <button onclick="salvarAjuste('${usuarioId}','${ligaId}')" style="width:100%;padding:10px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.9rem;">💾 Salvar Ajuste</button>
+                </div>
+                <div id="historico-ajustes" style="margin-top:8px;max-height:150px;overflow-y:auto;font-size:0.8rem;"></div>
+            `;
+            document.getElementById('popup-ajuste').style.display = 'flex';
+            carregarPontosAtuaisLiga(usuarioId, ligaId);
+            carregarHistoricoAjustes(usuarioId, ligaId);
+        }
+
+        function fecharPopupAjuste() {
+            document.getElementById('popup-ajuste').style.display = 'none';
+        }
+
+        async function carregarPontosAtuaisLiga(usuarioId, ligaId) {
+            const el = document.getElementById('pontos-atuais-ajuste');
+            if (!el) return;
+            const { data: jogosDoBanco } = await banco.from('jogos').select('*');
+            if (!jogosDoBanco) { el.innerText = '0'; return; }
+            const { data: todosPalpites } = await banco.from('palpites').select('*').eq('usuario_id', usuarioId);
+            const { data: membro } = await banco.from('liga_membros').select('joined_at').eq('usuario_id', usuarioId).eq('liga_id', ligaId).single();
+            const dataEntrada = membro ? new Date(membro.joined_at) : new Date(0);
+            let pontos = 0;
+            jogosDoBanco.forEach(jogo => {
+                if (jogo.res1 === null || jogo.res2 === null) return;
+                const dataJogo = getDataJogo(jogo.data);
+                if (dataJogo < dataEntrada) return;
+                const palpite = todosPalpites?.find(p => p.jogo_id === jogo.id);
+                if (!palpite) return;
+                const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                const r1 = jogo.res1, r2 = jogo.res2;
+                if (p1 === r1 && p2 === r2) pontos += 5;
+                else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontos += 3;
+            });
+            const { data: ajustes } = await banco.from('league_score_adjustments').select('pontos').eq('usuario_id', usuarioId).eq('liga_id', ligaId);
+            if (ajustes) ajustes.forEach(a => pontos += a.pontos);
+            el.innerText = pontos;
+        }
+
+        async function carregarHistoricoAjustes(usuarioId, ligaId) {
+            const el = document.getElementById('historico-ajustes');
+            if (!el) return;
+            const { data: ajustes } = await banco.from('league_score_adjustments')
+                .select('pontos, justificativa, created_at')
+                .eq('usuario_id', usuarioId)
+                .eq('liga_id', ligaId)
+                .order('created_at', { ascending: false });
+            if (!ajustes || ajustes.length === 0) { el.innerHTML = '<div style="color:#aaa;">Nenhum ajuste anterior.</div>'; return; }
+            let html = '<div style="font-weight:bold;font-size:0.8rem;color:#666;margin-bottom:4px;">Histórico de ajustes:</div>';
+            ajustes.forEach(a => {
+                const sinal = a.pontos > 0 ? '+' : '';
+                html += `<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;">
+                    <span style="color:${a.pontos >= 0 ? '#28a745' : '#d93025'};">${sinal}${a.pontos}</span>
+                    <span style="color:#888;"> — ${a.justificativa}</span>
+                </div>`;
+            });
+            el.innerHTML = html;
+        }
+
+        async function salvarAjuste(usuarioId, ligaId) {
+            const pontos = parseInt(document.getElementById('campo-pontos-ajuste').value);
+            const justificativa = document.getElementById('campo-justificativa-ajuste').value.trim();
+            if (isNaN(pontos) || pontos === 0) { alert("Informe um valor diferente de zero."); return; }
+            if (!justificativa) { alert("Justificativa é obrigatória."); return; }
+            const { error } = await banco.from('league_score_adjustments').insert({
+                liga_id: ligaId, usuario_id: usuarioId, pontos, justificativa
+            });
+            if (error) { alert('Erro: ' + error.message); return; }
+            alert('Ajuste salvo!');
+            carregarPontosAtuaisLiga(usuarioId, ligaId);
+            carregarHistoricoAjustes(usuarioId, ligaId);
+            await calcularEAtualizarRankingGeral();
         }
 
         function abrirPopupFiltros() {
@@ -2126,7 +2312,7 @@
                     const timeFora = match.away_team_name_en ? (en2pt[match.away_team_name_en] || match.away_team_name_en) : null;
                     const partes = match.local_date.split(' ');
                     const dataApi = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
-                    const dataFormatada = (timeCasa && timeFora) ? getDataBrasilia(timeCasa, timeFora, dataApi) : dataApi;
+                    const dataFormatada = getDataBrasilia(timeCasa, timeFora, dataApi, match);
                     const { error } = await banco.from('jogos').insert({
                         id: novoId++, grupo: '16 Avos', data: dataFormatada,
                         time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null
@@ -2573,6 +2759,16 @@
             </details>
 
             <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">⚖️ Ajuste de Pontuação (Liga)</summary>
+                <div style="margin-top:8px;">
+                <button onclick="criarTabelaAjustes()" style="width:100%;padding:6px;background:var(--secondary);color:var(--text);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.8rem;margin-bottom:6px;">➕ Criar tabela de ajustes</button>
+                <div id="status-ajustes" style="font-size:0.75rem;color:#888;text-align:center;margin-bottom:6px;"></div>
+                <button onclick="carregarLigasParaAjuste()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📋 Carregar ligas</button>
+                <div id="lista-ajustes" style="margin-top:8px;max-height:300px;overflow-y:auto;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
                 <summary style="cursor:pointer;color:#888;font-weight:bold;">🏆 Ligas</summary>
                 <div style="margin-top:8px;">
                 <button onclick="criarTabelasLigas()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">➕ Criar tabelas de ligas</button>
@@ -2599,6 +2795,14 @@
             <select id="filtro-dia-admin" onchange="renderizarListaJogosAdmin()" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;margin-bottom:8px;"></select>
             <div id="lista-jogos-admin" style="text-align: left; max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
             <button class="btn-acao" style="margin-top: 15px; background: #666;" onclick="fecharAdmin()">Fechar</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-ajuste" style="display:none;">
+        <div class="popup-conteudo" style="max-width: 450px;">
+            <button onclick="fecharPopupAjuste()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">⚖️ Ajustar Pontuação</h3>
+            <div id="conteudo-ajuste" style="text-align:left;"></div>
         </div>
     </div>
 
