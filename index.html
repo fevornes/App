@@ -496,6 +496,12 @@
             return new Date() >= getDataJogo(dataStr);
         }
 
+        function jogoFinalizadoPorTempo(dataStr) {
+            const inicio = getDataJogo(dataStr);
+            const fim = new Date(inicio.getTime() + 3 * 3600000);
+            return new Date() >= fim;
+        }
+
         function getDataJogo(dataStr) {
             const partes = dataStr.split(' - ');
             const dataParts = partes[0].split('/');
@@ -1195,7 +1201,7 @@
                                 let infoLinha = `${ehMataMataHoje ? '* ' : ''}${fase} • ${j.data}`;
                                 if (temResultado) infoLinha += ` | (Real: ${j.time1} ${j.res1} x ${j.res2} ${j.time2})`;
                                 const temPalpiteFase = p1Value !== '' && p2Value !== '';
-                                const ehFinalizadoFase = !jogosFinalizadosInicializado || jogosFinalizados.has(j.id);
+                                const ehFinalizadoFase = (jogosFinalizadosInicializado && jogosFinalizados.has(j.id)) || jogoFinalizadoPorTempo(j.data);
                                 const ehAoVivoFase = temResultado && encerrado && !ehFinalizadoFase;
                                 let labelFase = '';
                                 if (ehAoVivoFase) labelFase = '<div style="font-size:0.75rem;color:#dc3545;text-align:center;margin-top:5px;"><span class="live-indicator"></span>AO VIVO</div>';
@@ -1299,7 +1305,7 @@
                     const disabledAttr = encerrado ? 'disabled' : '';
                     const temResultado = jogo.res1 !== null && jogo.res2 !== null;
                     const temPalpite = p1Value !== '' && p2Value !== '';
-                    const ehFinalizado = !jogosFinalizadosInicializado || jogosFinalizados.has(jogo.id);
+                    const ehFinalizado = (jogosFinalizadosInicializado && jogosFinalizados.has(jogo.id)) || jogoFinalizadoPorTempo(jogo.data);
                     const ehAoVivo = temResultado && encerrado && !ehFinalizado;
                     const liveClass = ehAoVivo ? 'jogo-ao-vivo' : '';
 
