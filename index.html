@@ -180,6 +180,7 @@
             background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 400px;
             text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box;
             animation: surgirPopup 0.3s ease; position: relative;
+            max-height: 85vh; overflow-y: auto;
         }
         @keyframes surgirPopup { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .popup-titulo { color: var(--primary); font-size: 1.4rem; margin-top: 0; margin-bottom: 10px; }
@@ -1780,6 +1781,58 @@
             await calcularEAtualizarRankingGeral();
         }
 
+        async function carregarParaAdicionarPalpite() {
+            const el = document.getElementById('area-adicionar-palpite');
+            if (!el) return;
+            el.innerHTML = 'Carregando...';
+            const { data: perfis } = await banco.from('perfis').select('id, nome');
+            const { data: todosJogos } = await banco.from('jogos').select('id, time1, time2, data, grupo').order('id', { ascending: true });
+            if (!perfis || !todosJogos) { el.innerHTML = '<div style="color:#888;">Erro ao carregar.</div>'; return; }
+            let html = `
+                <label style="font-size:0.8rem;font-weight:bold;display:block;margin-bottom:4px;">Usuário:</label>
+                <select id="sel-user-palpite" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;margin-bottom:8px;box-sizing:border-box;">
+                    <option value="">Selecione...</option>
+                    ${perfis.map(p => `<option value="${p.id}">${p.nome}</option>`).join('')}
+                </select>
+                <label style="font-size:0.8rem;font-weight:bold;display:block;margin-bottom:4px;">Jogo:</label>
+                <select id="sel-jogo-palpite" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;margin-bottom:8px;box-sizing:border-box;">
+                    <option value="">Selecione...</option>
+                    ${todosJogos.map(j => `<option value="${j.id}">${j.grupo} - ${j.time1} x ${j.time2} (${j.data})</option>`).join('')}
+                </select>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.8rem;font-weight:bold;display:block;margin-bottom:4px;">Palpite Time 1:</label>
+                        <input type="number" id="adm-palpite-t1" min="0" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.8rem;font-weight:bold;display:block;margin-bottom:4px;">Palpite Time 2:</label>
+                        <input type="number" id="adm-palpite-t2" min="0" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;box-sizing:border-box;">
+                    </div>
+                </div>
+                <button onclick="salvarPalpiteAdmin()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">💾 Salvar Palpite</button>
+                <div id="status-palpite-admin" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+            `;
+            el.innerHTML = html;
+        }
+
+        async function salvarPalpiteAdmin() {
+            const el = document.getElementById('status-palpite-admin');
+            if (!el) return;
+            const usuarioId = document.getElementById('sel-user-palpite').value;
+            const jogoId = document.getElementById('sel-jogo-palpite').value;
+            const t1 = document.getElementById('adm-palpite-t1').value;
+            const t2 = document.getElementById('adm-palpite-t2').value;
+            if (!usuarioId || !jogoId || t1 === '' || t2 === '') { alert("Preencha todos os campos!"); return; }
+            el.innerText = '🔄 Salvando...';
+            const { error } = await banco.from('palpites').upsert(
+                { usuario_id: usuarioId, jogo_id: parseInt(jogoId), palpite_time1: parseInt(t1), palpite_time2: parseInt(t2) },
+                { onConflict: 'usuario_id,jogo_id' }
+            );
+            if (error) { el.innerText = '❌ Erro: ' + error.message; return; }
+            el.innerText = '✅ Palpite salvo!';
+            await calcularEAtualizarRankingGeral();
+        }
+
         function abrirPopupFiltros() {
             document.getElementById('popup-filtros').style.display = 'flex';
             mudarAbaFiltro('cravada');
@@ -2679,9 +2732,9 @@
         </div>
     </div>
 
-    <div class="popup-notificacao" id="popup-admin" style="display: none;">
+            <div class="popup-notificacao" id="popup-admin" style="display: none;">
         <div class="popup-conteudo" style="max-width: 500px;">
-            <button onclick="fecharAdmin()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <button onclick="fecharAdmin()" style="position:sticky;top:0;float:right;z-index:2;background:white;border:none;font-size:1.2rem;cursor:pointer;color:#888;border-radius:50%;padding:4px 8px;">✖</button>
             <h3 class="popup-titulo">⚙️ Painel de Adm</h3>
 
             <details style="margin-bottom:15px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
@@ -2753,6 +2806,14 @@
                 <summary style="cursor:pointer;color:#888;font-weight:bold;">🔔 Notificar todos</summary>
                 <div style="margin-top:8px;">
                 <button onclick="notificarTodos()" style="width:100%;padding:8px;background:var(--secondary);color:var(--text);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">🔔 Notificar todos sobre resultados</button>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">📋 Adicionar Palpite (Admin)</summary>
+                <div style="margin-top:8px;">
+                <button onclick="carregarParaAdicionarPalpite()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📋 Carregar dados</button>
+                <div id="area-adicionar-palpite" style="margin-top:8px;"></div>
                 </div>
             </details>
 
