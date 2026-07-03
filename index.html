@@ -59,6 +59,7 @@
 
         .tabs-container {
             display: flex; overflow-x: auto; gap: 10px; margin-bottom: 20px; padding-bottom: 8px; width: 100%;
+            justify-content: center;
         }
         .tabs-container::-webkit-scrollbar { height: 6px; }
         .tabs-container::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
@@ -1152,7 +1153,15 @@
                 }
 
                 // Criar abas de dia (fase de grupos) - filtradas pelas configuracoes
-                const diasVisiveis = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+                let diasVisiveis = null;
+                try {
+                    const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
+                    if (data?.valor) diasVisiveis = JSON.parse(data.valor);
+                    else { const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null'); if (local) diasVisiveis = local; }
+                } catch (e) {
+                    const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+                    if (local) diasVisiveis = local;
+                }
                 const diasParaMostrar = diasVisiveis || diasUnicos;
                 diasUnicos.filter(d => diasParaMostrar.includes(d)).forEach(dia => {
                         const btn = document.createElement('button');
@@ -1624,6 +1633,10 @@
                 pontos INTEGER NOT NULL,
                 justificativa TEXT NOT NULL,
                 created_at TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE TABLE IF NOT EXISTS configuracoes (
+                chave TEXT PRIMARY KEY,
+                valor TEXT
             );`;
         }
 
@@ -1848,7 +1861,8 @@
             div.innerHTML = '';
             let total = 0;
 
-            jogos.forEach(jogo => {
+            const jogosOrdenados = [...jogos].sort((a, b) => getDataJogo(b.data).getTime() - getDataJogo(a.data).getTime());
+            jogosOrdenados.forEach(jogo => {
                 if (jogo.res1 === null || jogo.res2 === null) return;
                 const palpite = palpitesSalvosFiltro ? palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id) : null;
                 if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
@@ -2310,18 +2324,27 @@
             window.location.reload();
         }
 
-        function abrirPopupDias() {
+        async function abrirPopupDias() {
             fecharMenu();
             const container = document.getElementById('lista-dias-popup');
-            container.innerHTML = '';
+            container.innerHTML = 'Carregando...';
+            document.getElementById('popup-dias').style.display = 'flex';
             const todosDias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
             todosDias.sort((a, b) => {
                 const [dA, mA] = a.split('/').map(Number);
                 const [dB, mB] = b.split('/').map(Number);
                 return mA - mB || dA - dB;
             });
-            const salvos = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
-            const visiveis = salvos || todosDias;
+            let visiveis = todosDias;
+            try {
+                const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
+                if (data?.valor) visiveis = JSON.parse(data.valor);
+                else { const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null'); if (local) visiveis = local; }
+            } catch (e) {
+                const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+                if (local) visiveis = local;
+            }
+            container.innerHTML = '';
             todosDias.forEach(dia => {
                 const checked = visiveis.includes(dia) ? 'checked' : '';
                 container.innerHTML += `
@@ -2331,19 +2354,23 @@
                     </label>
                 `;
             });
-            document.getElementById('popup-dias').style.display = 'flex';
         }
         function fecharPopupDias() {
             document.getElementById('popup-dias').style.display = 'none';
         }
-        function salvarDiasVisiveis() {
+        async function salvarDiasVisiveis() {
             const checks = document.querySelectorAll('.dia-check');
             const selecionados = [];
             checks.forEach(c => { if (c.checked) selecionados.push(c.value); });
-            if (selecionados.length === 0) {
-                localStorage.removeItem('diasVisiveis');
-            } else {
-                localStorage.setItem('diasVisiveis', JSON.stringify(selecionados));
+            const valor = selecionados.length === 0 ? null : JSON.stringify(selecionados);
+            try {
+                await banco.from('configuracoes').upsert(
+                    { chave: 'dias_visiveis', valor },
+                    { onConflict: 'chave' }
+                );
+            } catch (e) {
+                if (valor) localStorage.setItem('diasVisiveis', valor);
+                else localStorage.removeItem('diasVisiveis');
             }
             fecharPopupDias();
             carregarJogosEJogadores();
@@ -2644,7 +2671,8 @@
             div.innerHTML = '';
             let total = 0;
 
-            jogos.forEach(jogo => {
+            const jogosOrdenados = [...jogos].sort((a, b) => getDataJogo(b.data).getTime() - getDataJogo(a.data).getTime());
+            jogosOrdenados.forEach(jogo => {
                 if (jogo.res1 === null || jogo.res2 === null) return;
                 const palpite = palpitesUsuarioAlvo.find(p => p.jogo_id === jogo.id);
                 if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
