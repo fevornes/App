@@ -870,6 +870,14 @@
             add('Austrália','Egito','03/07 - 15:00');
             add('Argentina','Cabo Verde','03/07 - 19:00');
             add('Colômbia','Gana','03/07 - 22:30');
+            add('Canadá','Marrocos','04/07 - 14:00');
+            add('Paraguai','França','04/07 - 18:00');
+            add('Brasil','Noruega','05/07 - 17:00');
+            add('México','Inglaterra','05/07 - 21:00');
+            add('Portugal','Espanha','06/07 - 16:00');
+            add('Estados Unidos','Bélgica','06/07 - 21:00');
+            add('Argentina','Egito','07/07 - 13:00');
+            add('Suíça','Colômbia','07/07 - 17:00');
             return h;
         })();
 
@@ -1278,12 +1286,10 @@
                     btn.onclick = () => alternarAbaGrupo(grupo);
                     gruposContainer.appendChild(btn);
                 });
-                // Ativar aba: 16 Avos a partir de 28/06, senão primeiro dia
-                if (hoje >= new Date(2026, 5, 28)) {
-                    const tab16 = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === '16 Avos');
-                    if (tab16) tab16.click();
-                    else { const p = document.querySelector('#dias-tabs .tab-btn'); if (p) p.click(); }
-                } else {
+                // Ativar aba: Oitavas como padrão
+                const tabOitavas = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === 'Oitavas');
+                if (tabOitavas) tabOitavas.click();
+                else {
                     const p = document.querySelector('#dias-tabs .tab-btn');
                     if (p) p.click();
                 }
