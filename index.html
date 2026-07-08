@@ -878,6 +878,10 @@
             add('Estados Unidos','Bélgica','06/07 - 21:00');
             add('Argentina','Egito','07/07 - 13:00');
             add('Suíça','Colômbia','07/07 - 17:00');
+            add('França','Marrocos','09/07 - 17:00');
+            add('Espanha','Bélgica','10/07 - 16:00');
+            add('Noruega','Inglaterra','11/07 - 18:00');
+            add('Argentina','Suíça','11/07 - 22:00');
             return h;
         })();
 
@@ -1254,6 +1258,7 @@
                                 if (p1 && p2) {
                                     valoresOriginais[`${j.id}_p1`] = p1.value;
                                     valoresOriginais[`${j.id}_p2`] = p2.value;
+                                    p1.oninput = p2.oninput = atualizarEstadoBotao;
                                 }
                             });
                             atualizarEstadoBotao();
@@ -1286,9 +1291,9 @@
                     btn.onclick = () => alternarAbaGrupo(grupo);
                     gruposContainer.appendChild(btn);
                 });
-                // Ativar aba: Oitavas como padrão
-                const tabOitavas = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === 'Oitavas');
-                if (tabOitavas) tabOitavas.click();
+                // Ativar aba: Quartas como padrão
+                const tabQuartas = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === 'Quartas');
+                if (tabQuartas) tabQuartas.click();
                 else {
                     const p = document.querySelector('#dias-tabs .tab-btn');
                     if (p) p.click();
