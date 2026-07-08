@@ -1164,16 +1164,12 @@
                     document.getElementById('container-fase').style.display = 'none';
                 }
 
-                // Criar abas de dia (fase de grupos) - filtradas pelas configuracoes
+                // Criar abas de dia (fase de grupos) - filtradas pela config do admin no banco
                 let diasVisiveis = null;
                 try {
                     const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
                     if (data?.valor) diasVisiveis = JSON.parse(data.valor);
-                    else { const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null'); if (local) diasVisiveis = local; }
-                } catch (e) {
-                    const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
-                    if (local) diasVisiveis = local;
-                }
+                } catch (e) {}
                 const diasParaMostrar = diasVisiveis || diasUnicos;
                 diasUnicos.filter(d => diasParaMostrar.includes(d)).forEach(dia => {
                         const btn = document.createElement('button');
@@ -2350,11 +2346,7 @@
             try {
                 const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
                 if (data?.valor) visiveis = JSON.parse(data.valor);
-                else { const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null'); if (local) visiveis = local; }
-            } catch (e) {
-                const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
-                if (local) visiveis = local;
-            }
+            } catch (e) {}
             container.innerHTML = '';
             todosDias.forEach(dia => {
                 const checked = visiveis.includes(dia) ? 'checked' : '';
@@ -2373,7 +2365,7 @@
             const checks = document.querySelectorAll('.dia-check');
             const selecionados = [];
             checks.forEach(c => { if (c.checked) selecionados.push(c.value); });
-            const valor = selecionados.length === 0 ? null : JSON.stringify(selecionados);
+            const valor = selecionados.length === 0 || selecionados.length === checks.length ? null : JSON.stringify(selecionados);
             try {
                 await banco.from('configuracoes').upsert(
                     { chave: 'dias_visiveis', valor },
