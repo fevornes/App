@@ -1,0 +1,2926 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Bolão Copa 2026</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#038C3E">
+    
+    <link class="icon-app" rel="apple-touch-icon" href="icone.svg">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="icon" type="image/svg+xml" href="icone.svg">
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1"></script>
+    <style>
+        :root {
+            --primary: #038C3E;
+            --secondary: #F2B705;
+            --background: #F2F2F2;
+            --card: #FFFFFF;
+            --text: #333333;
+            
+            --cor-acerto-exato: #28a745;
+            --cor-acerto-vencedor: #6c757d;
+            --cor-erro: #dc3545;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 20px 20px 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { color: var(--primary); margin-bottom: 5px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 0.9rem; }
+
+        .auth-container, .ranking-container, #area-jogos-wrapper {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+            box-sizing: border-box;
+        }
+
+        .auth-titulo { text-align: center; color: var(--primary); margin-top: 5px; margin-bottom: 20px; }
+        #area-jogos-wrapper { background: transparent; padding: 0; box-shadow: none; }
+        #container-jogos { display: flex; flex-direction: column; gap: 15px; }
+
+        .tabs-container {
+            display: flex; overflow-x: auto; gap: 10px; margin-bottom: 20px; padding-bottom: 8px; width: 100%;
+            justify-content: center;
+        }
+        .tabs-container::-webkit-scrollbar { height: 6px; }
+        .tabs-container::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+
+        .tab-btn {
+            padding: 8px 16px; background-color: var(--card); border: 2px solid #ddd;
+            border-radius: 20px; cursor: pointer; font-weight: bold; color: #666;
+            white-space: nowrap; transition: all 0.2s;
+        }
+        .tab-btn.ativo { background-color: var(--primary); color: white; border-color: var(--primary); }
+
+        .auth-form { display: flex; flex-direction: column; gap: 12px; }
+        input[type="text"], input[type="email"], input[type="password"] {
+            padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem;
+            box-sizing: border-box; width: 100%;
+        }
+
+        .jogo-card {
+            background: var(--card); border-radius: 12px; padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;
+            border: 3px solid transparent;
+            transition: border-color 0.3s ease;
+        }
+
+        .jogo-card.acerto-exato { border-color: var(--cor-acerto-exato); }
+        .jogo-card.acerto-vencedor { border-color: var(--cor-acerto-vencedor); }
+        .jogo-card.erro-total { border-color: var(--cor-erro); }
+
+        .info-jogo { font-size: 0.8rem; color: #888; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        
+        .placar-container { 
+            display: grid; 
+            grid-template-columns: 1fr 45px auto 45px 1fr; 
+            align-items: center; 
+            gap: 8px; 
+            font-weight: bold; 
+            width: 100%;
+        }
+        
+        .time { 
+            font-size: 0.9rem; 
+            line-height: 1.2; 
+            word-wrap: break-word; 
+            text-align: center;
+            width: 100%;
+        }
+        .time.mandante { justify-self: center; }
+        .time.visitante { justify-self: center; }
+        .time-scorers { font-size: 0.65rem; color: #888; line-height: 1.2; margin-top: 2px; font-family: Arial, sans-serif; }
+        .time-scorers.left { text-align: left; }
+        .time-scorers.right { text-align: right; }
+        
+        input[type="number"] {
+            width: 100%; height: 38px; text-align: center; font-size: 1.1rem;
+            font-weight: bold; border: 2px solid #ddd; border-radius: 6px; margin: 0; padding: 0;
+            box-sizing: border-box; line-height: 38px;
+            -moz-appearance: textfield;
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none; margin: 0;
+        }
+        
+        .placar-container span { text-align: center; font-size: 0.9rem; color: #888; }
+
+        .btn-acao {
+            background-color: var(--primary); color: white; border: none; padding: 12px;
+            border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 5px;
+            transition: background-color 0.3s;
+        }
+        .btn-acao.desativado { background-color: #bbb; cursor: not-allowed; }
+        .btn-logout { background-color: #d93025; padding: 10px; font-size: 1rem; font-weight: bold; border-radius: 8px; color: white; border: none; cursor: pointer; width: 100%; }
+
+        .ranking-titulo { font-size: 1.2rem; color: var(--primary); margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid var(--secondary); padding-bottom: 5px; }
+        .ranking-linha { display: flex; justify-content: space-between; padding: 8px 5px; border-bottom: 1px solid #eee; }
+        .ranking-linha.voce { background-color: #e6f4ea; font-weight: bold; border-radius: 6px; }
+        .link-alternar { text-align: center; font-size: 0.9rem; color: #666; margin-top: 10px; }
+        .link-alternar a { color: var(--primary); font-weight: bold; text-decoration: none; }
+
+
+
+        .btn-header-menu { background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text); padding: 0; }
+        .menu-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 998; }
+        
+        .menu-lateral {
+            position: fixed; top: 0; right: -300px; width: 300px; height: 100%; 
+            background: var(--card); box-shadow: -2px 0 10px rgba(0,0,0,0.1); z-index: 999;
+            transition: right 0.3s ease; padding: 20px; box-sizing: border-box; 
+            display: flex; flex-direction: column; gap: 15px; overflow-y: auto;
+            border-radius: 16px 0 0 16px;
+        }
+        .menu-lateral.aberto { right: 0; }
+        
+        .btn-fechar-menu { align-self: flex-end; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; margin-bottom: -5px; }
+        .menu-divisor { width: 100%; border: 0; border-top: 1px solid #eee; margin: 2px 0; }
+        
+        .menu-section { display: flex; flex-direction: column; gap: 8px; }
+        .menu-section-title { font-size: 0.95rem; font-weight: bold; color: var(--primary); margin: 0; }
+        
+        .info-box { background: #f8f9fa; padding: 12px; border-radius: 8px; font-size: 0.85rem; color: #444; border: 1px solid #e9ecef; }
+        .info-box p { margin: 6px 0; line-height: 1.3; }
+        .info-box p:first-child { margin-top: 0; }
+        .info-box p:last-child { margin-bottom: 0; }
+        
+        .legenda-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 500; color: #444; }
+        .legenda-item:last-child { margin-bottom: 0; }
+        .cor-box { width: 18px; height: 18px; border-radius: 4px; border: 2px solid; }
+        .cor-box.exato { border-color: var(--cor-acerto-exato); background: #e8f5e9; }
+        .cor-box.vencedor { border-color: var(--cor-acerto-vencedor); background: #f8f9fa; }
+        .cor-box.erro { border-color: var(--cor-erro); background: #fdeaea; }
+
+        /* --- POP-UPS (NOTIFICAÇÃO E TUTORIAL DE INSTALAÇÃO) --- */
+        .popup-notificacao {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
+            padding: 20px; box-sizing: border-box;
+        }
+        .popup-conteudo {
+            background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 400px;
+            text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box;
+            animation: surgirPopup 0.3s ease; position: relative;
+            max-height: 85vh; overflow-y: auto;
+        }
+        @keyframes surgirPopup { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .popup-titulo { color: var(--primary); font-size: 1.4rem; margin-top: 0; margin-bottom: 10px; }
+        .popup-texto { color: #555; font-size: 1rem; margin-bottom: 20px; line-height: 1.4; }
+
+        /* Estilos específicos para as Abas do Tutorial dentro do pop-up */
+        .tutorial-tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .t-tab-btn { flex: 1; padding: 8px; border: none; background: #eee; cursor: pointer; border-radius: 6px; font-weight: bold; color: #555; }
+        .t-tab-btn.ativo { background: var(--primary); color: white; }
+        .tutorial-passos { text-align: left; font-size: 0.9rem; color: #444; line-height: 1.5; }
+        .tutorial-passos ol { padding-left: 20px; margin: 10px 0; }
+        .tutorial-passos li { margin-bottom: 8px; }
+
+        .onb-slide { display: none; }
+        .onb-slide.ativo { display: flex; flex-direction: column; align-items: center; }
+        .onb-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; transition: background 0.2s; }
+        .onb-dot.ativo { background: var(--primary); }
+        .btn-onb-nav { background: none; border: 1px solid #ddd; border-radius: 8px; color: #555; font-size: 0.85rem; cursor: pointer; padding: 8px 14px; transition: all 0.2s; }
+        .btn-onb-nav:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-onb-prox { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+        .btn-onb-prox:hover { background: #026d2e; border-color: #026d2e; color: #fff; }
+        .btn-onb-pular { display: block; margin: 14px auto 0; background: none; border: none; color: #bbb; font-size: 0.8rem; cursor: pointer; padding: 4px 8px; transition: color 0.2s; }
+        .btn-onb-pular:hover { color: #888; }
+
+        .btn-limpar {
+            background: none; border: none; color: #d93025; cursor: pointer;
+            font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold;
+        }
+        .btn-limpar:hover { background: #fdeaea; }
+
+        .chart-container { width: 100%; max-width: 100%; overflow-x: auto; margin: 10px 0; }
+        .chart-container canvas { display: block; margin: 0 auto; }
+
+        .grupo-tabs { margin-top: -10px; margin-bottom: 15px; }
+
+        .live-indicator {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: #dc3545; margin-right: 4px; animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; }
+        .stat-item { background: #f8f9fa; padding: 10px; border-radius: 8px; }
+        .stat-valor { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+        .stat-label { font-size: 0.7rem; color: #888; }
+
+        .ranking-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+        .ranking-tab { flex: 1; padding: 6px 10px; border: 2px solid #ddd; border-radius: 8px; background: white; font-weight: bold; font-size: 0.8rem; cursor: pointer; text-align: center; color: #888; transition: all 0.2s; }
+        .ranking-tab.ativo { background: var(--primary); color: white; border-color: var(--primary); }
+        .liga-tag { display: inline-block; background: var(--secondary); color: var(--text); padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: bold; margin-left: 6px; }
+    </style>
+</head>
+<body>
+
+    <h1 style="font-family:'Georgia','Times New Roman',serif;font-weight:700;text-shadow:1px 1px 2px rgba(0,0,0,0.15);text-align:center;"><div style="font-size:2.5rem;">🏆</div>Bolão da Copa</h1>
+    <p class="subtitle">Mostre que você entende de futebol!</p>
+
+    <div id="login-secao" class="auth-container">
+        <h3 class="auth-titulo">Entrar no Bolão</h3>
+        <div class="auth-form">
+            <input type="email" id="login-email" placeholder="Seu E-mail">
+            <input type="password" id="login-password" placeholder="Sua Senha">
+            <button class="btn-acao" onclick="fazerLogin()">Entrar</button>
+            <div style="text-align:center;font-size:0.85rem;margin-top:4px;"><a href="#" onclick="abrirPopupResetSenha()" style="color:#888;">Esqueceu a senha?</a></div>
+            <div class="link-alternar">Não tem uma conta? <a href="#" onclick="alternarTelas('cadastro')">Cadastre-se aqui</a></div>
+        </div>
+    </div>
+
+    <div id="cadastro-secao" class="auth-container" style="display: none;">
+        <h3 class="auth-titulo">Criar Nova Conta</h3>
+        <div class="auth-form">
+            <input type="text" id="cadastro-nome" placeholder="Seu Nome e Sobrenome">
+            <input type="email" id="cadastro-email" placeholder="Seu E-mail">
+            <input type="password" id="cadastro-password" placeholder="Crie uma Senha">
+            <button class="btn-acao" style="background-color: var(--secondary); color: var(--text);" onclick="fazerCadastro()">Confirmar Cadastro</button>
+            <div class="link-alternar">Já tem conta? <a href="#" onclick="alternarTelas('login')">Faça login</a></div>
+        </div>
+    </div>
+
+    <div id="jogo-secao" style="display: none; width: 100%; max-width: 500px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
+            <span id="usuario-saudacao" style="font-weight: bold; font-size: 1.1rem;"></span>
+            <div style="display: flex; gap: 6px;">
+                <button style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text);padding:0;" onclick="sincronizarAuto()" title="Atualizar resultados">🔄</button>
+                <button style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text);padding:0;" onclick="abrirPopupFiltros()" title="Meus Resultados">🎯</button>
+                <button class="btn-header-menu" onclick="abrirMenu()">☰</button>
+            </div>
+        </div>
+
+        <div class="ranking-container">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--secondary);padding-bottom:5px;margin-bottom:15px;">
+                <h3 class="ranking-titulo" style="margin:0;border:none;padding:0;">📊 Classificação Geral</h3>
+                <button onclick="compartilharRanking()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;padding:0;line-height:1;" title="Compartilhar classificação">📤</button>
+            </div>
+            <div id="tabela-ranking">Carregando classificação...</div>
+        </div>
+
+        <div id="area-jogos-wrapper">
+            <div class="tabs-container" id="dias-tabs"></div>
+            <div class="tabs-container grupo-tabs" id="grupo-tabs" style="display:none;"></div>
+            <div id="container-jogos"></div>
+            <div id="container-fase" style="display:none;"></div>
+            <button class="btn-acao desativado" id="btn-salvar" style="margin-top: 15px; margin-bottom: 15px; font-size: 1.2rem;" onclick="salvarPalpitesNoBanco()">SALVAR MEUS PALPITES</button>
+            <div style="width:100%;text-align:center;font-size:0.7rem;color:#000;margin-bottom:40px;font-style:italic;font-family:'Georgia','Times New Roman',serif;">fevornes</div>
+        </div>
+    </div>
+
+    <div class="menu-overlay" id="menu-overlay" onclick="fecharMenu()"></div>
+    <div class="menu-lateral" id="menu-lateral">
+        <button class="btn-fechar-menu" onclick="fecharMenu()">✖</button>
+        
+        <h3 style="margin-top: -10px; margin-bottom: 5px; color: var(--primary); font-size: 1.3rem;">⚙️ Menu</h3>
+        
+        <button class="btn-acao" style="background-color: var(--secondary); color: var(--text); padding: 10px; font-size: 0.95rem; margin-top: 0; margin-bottom: 5px;" onclick="abrirTutorialInstalacao()">📱 Instalar Aplicativo</button>
+
+        <hr class="menu-divisor">
+        
+        <div class="menu-section">
+            <p class="menu-section-title">👤 Alterar Perfil</p>
+            <input type="text" id="input-mudar-nome" placeholder="Digite o novo nome...">
+            <button class="btn-acao" style="padding: 10px; font-size: 0.9rem; margin-top: 0;" onclick="salvarNovoNome()">Atualizar Nome</button>
+        </div>
+
+        <hr class="menu-divisor">
+
+        <div class="menu-section">
+            <p class="menu-section-title">🏆 Ligas</p>
+            <div style="display:flex;gap:6px;">
+                <button class="btn-acao" style="padding:8px;font-size:0.8rem;margin:0;flex:1;" onclick="criarLiga()">➕ Criar Liga</button>
+                <button class="btn-acao" style="padding:8px;font-size:0.8rem;margin:0;flex:1;background:var(--secondary);color:var(--text);" onclick="entrarNaLiga()">🔗 Entrar com código</button>
+            </div>
+            <button onclick="abrirPopupLigaInfo()" style="background:none;border:none;color:var(--primary);font-size:0.75rem;cursor:pointer;margin-top:4px;text-decoration:underline;">❓ Como funciona as ligas?</button>
+            <div id="lista-minhas-ligas" style="margin-top:8px;"></div>
+        </div>
+
+        <hr class="menu-divisor">
+
+        <div class="menu-section" style="flex-direction:row;gap:8px;">
+            <button class="btn-acao" style="padding:10px;font-size:0.85rem;margin:0;flex:1;" onclick="abrirPopupEstatisticas()">📊 Minhas Stats</button>
+            <button class="btn-acao" style="padding:10px;font-size:0.85rem;margin:0;flex:1;background:var(--secondary);color:var(--text);" onclick="abrirPopupGrafico()">📈 Evolução</button>
+        </div>
+
+        <hr class="menu-divisor">
+
+        <div class="menu-section">
+            <p class="menu-section-title">📏 Regra de Pontuação</p>
+            <div class="info-box">
+                <p><strong>5 Pontos:</strong> Acertou na mosca o placar exato da partida.</p>
+                <p><strong>3 Pontos:</strong> Acertou quem venceu ou o empate, mas errou o placar.</p>
+                <p><strong>0 Pontos:</strong> Errou o resultado final.</p>
+            </div>
+        </div>
+
+        <hr class="menu-divisor">
+
+        <div class="menu-section">
+            <p class="menu-section-title">🎨 Legenda de Cores</p>
+            <div class="info-box">
+                <div class="legenda-item"><span class="cor-box exato"></span> Acerto Exato (5 pts)</div>
+                <div class="legenda-item"><span class="cor-box vencedor"></span> Acerto Vencedor (3 pts)</div>
+                <div class="legenda-item"><span class="cor-box erro"></span> Erro (0 pts)</div>
+            </div>
+        </div>
+
+        <hr class="menu-divisor">
+
+        
+    <hr class="menu-divisor">
+
+    <button style="background: none; border: none; color: #888; font-size: 0.75rem; cursor: pointer; text-decoration: underline; padding: 4px; text-align: center; width: 100%;" onclick="abrirAdmin()">⚙️ Painel Admin</button>
+        <hr class="menu-divisor">
+
+        <button class="btn-logout" style="margin-top: 5px;" onclick="deslogar()">Sair do Aplicativo</button>
+    </div>
+
+    <div class="popup-notificacao" id="popup-liga-info">
+        <div class="popup-conteudo">
+            <button onclick="fecharPopupLigaInfo()" style="position: absolute; top: 12px; right: 15px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #888;">✖</button>
+            <h3 class="popup-titulo">🏆 Novidade: Ligas!</h3>
+            <div class="popup-texto" style="text-align:left;font-size:0.9rem;line-height:1.6;">
+                <p><strong>Crie sua própria liga</strong> e desafie seus amigos!</p>
+                <p>📋 <strong>Como funciona:</strong></p>
+                <ul style="padding-left:20px;margin:8px 0;">
+                    <li>Crie uma liga no menu 🏆 Ligas</li>
+                    <li>Compartilhe o <strong>código de 4 letras</strong> com seus amigos</li>
+                    <li>Eles entram com o código e já estão na liga!</li>
+                </ul>
+                <p>⚡ <strong>Pontuação da liga:</strong></p>
+                <ul style="padding-left:20px;margin:8px 0;">
+                    <li>Cada um começa com <strong>0 pontos</strong></li>
+                    <li>Só valem os palpites feitos <strong>depois de entrar</strong></li>
+                    <li>Acerto exato = 5 pts | Acertou vencedor = 3 pts</li>
+                </ul>
+                <p>🔄 <strong>Trocar ranking:</strong> Na tela principal, use as abas 📊 Geral e 🏆 Sua Liga para alternar!</p>
+            </div>
+            <button class="btn-acao" onclick="fecharPopupLigaInfo()">Entendi!</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-aviso">
+        <div class="popup-conteudo">
+            <h3 class="popup-titulo">⚽ Ranking Updated!</h3>
+            <p class="popup-texto" id="popup-texto-data">Novos resultados oficiais foram adicionados pela banca do bolão. Venha conferir como ficou a classificação geral!</p>
+            <button class="btn-acao" onclick="fecharPopupAviso()">Ver Classificação</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-tutorial">
+        <div class="popup-conteudo">
+            <button onclick="fecharTutorialInstalacao()" style="position: absolute; top: 12px; right: 15px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #888;">✖</button>
+            <h3 class="popup-titulo" style="margin-bottom: 15px; font-size: 1.2rem;">Como Instalar no Celular</h3>
+            
+            <div class="tutorial-tabs">
+                <button class="t-tab-btn ativo" id="btn-tab-android" onclick="mudarAbaTutorial('android')">🤖 Android</button>
+                <button class="t-tab-btn" id="btn-tab-ios" onclick="mudarAbaTutorial('ios')">🍏 iPhone (iOS)</button>
+            </div>
+
+            <div id="passos-android" class="tutorial-passos">
+                <p>Se você usa o navegador <strong>Google Chrome</strong>:</p>
+                <ol>
+                    <li>Toque nos <strong>três pontinhos ( ⁝ )</strong> no canto superior direito da tela.</li>
+                    <li>Clique na opção <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
+                    <li>Pronto! O Polvo Paul vai aparecer junto com as suas redes sociais.</li>
+                </ol>
+            </div>
+
+            <div id="passos-ios" class="tutorial-passos" style="display: none;">
+                <p>Você precisa abrir o site pelo navegador padrão <strong>Safari</strong>:</p>
+                <ol>
+                    <li>Toque no botão de <strong>Compartilhar</strong> (o ícone de um quadrado com uma seta para cima na barra de baixo).</li>
+                    <li>Role as opções para baixo e clique em <strong>"Adicionar à Tela de Início"</strong>.</li>
+                    <li>Clique em <strong>Adicionar</strong> no canto superior direito e o ícone estará fixado no seu celular!</li>
+                </ol>
+            </div>
+            
+            <button class="btn-acao" style="margin-top: 15px; padding: 10px;" onclick="fecharTutorialInstalacao()">Entendi</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-onboarding">
+        <div class="popup-conteudo" style="max-width: 420px; padding: 30px 25px;">
+            <h3 class="popup-titulo" style="margin-bottom: 8px;">Bem-vindo ao Meu Bolão! 🏆</h3>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">Veja como funciona:</p>
+            <div id="onboarding-slide" style="min-height: 280px; display: flex; flex-direction: column; justify-content: center;">
+                <div class="onb-slide ativo" data-step="1">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">⚽</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">1. Palpites</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">Digite seus palpites para cada jogo da Copa. Um palpite tem dois números: <strong>gols do time da casa</strong> × <strong>gols do time visitante</strong>.</p>
+                </div>
+                <div class="onb-slide" data-step="2">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">📋</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">2. Grupos</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">Use as abas <strong>Grupo A, B, C...</strong> para filtrar os jogos por grupo. Assim fica mais fácil organizar seus palpites.</p>
+                </div>
+                <div class="onb-slide" data-step="3">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">📊</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">3. Classificação</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">Acesse a <strong>Classificação</strong> para ver o ranking de todos os participantes. Clique em qualquer jogador para ver os palpites dele.</p>
+                </div>
+                <div class="onb-slide" data-step="4">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">📈</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">4. Estatísticas</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">No <strong>Perfil</strong> você vê suas estatísticas: acertos exatos, saldo de gols, evolução por rodada e muito mais.</p>
+                </div>
+                <div class="onb-slide" data-step="5">
+                    <div style="font-size: 3rem; text-align: center; margin-bottom: 12px;">🔴</div>
+                    <h4 style="margin: 0 0 8px; text-align: center;">5. Modo Ao Vivo</h4>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.5;">Ative o <strong>Modo Ao Vivo 🔴</strong> para ver os resultados oficiais em tempo real ao lado dos seus palpites.</p>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 20px;">
+                <button onclick="onboardingAnterior()" id="btn-onb-ant" class="btn-onb-nav" style="visibility: hidden;">← Anterior</button>
+                <div id="onb-dots" style="display: flex; gap: 6px;">
+                    <span class="onb-dot ativo"></span>
+                    <span class="onb-dot"></span>
+                    <span class="onb-dot"></span>
+                    <span class="onb-dot"></span>
+                    <span class="onb-dot"></span>
+                </div>
+                <button onclick="onboardingProximo()" id="btn-onb-prox" class="btn-onb-nav btn-onb-prox">Próximo →</button>
+            </div>
+            <button onclick="fecharOnboarding()" class="btn-onb-pular">Pular tutorial</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-reset-senha">
+        <div class="popup-conteudo">
+            <button onclick="fecharPopupResetSenha()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">🔑 Recuperar Senha</h3>
+            <p style="color:#555;font-size:0.9rem;margin-bottom:15px;">Digite seu e-mail e enviaremos um link para redefinir sua senha.</p>
+            <input type="email" id="reset-email" placeholder="Seu E-mail" style="margin-bottom:12px;">
+            <button class="btn-acao" onclick="enviarResetSenha()">Enviar Link</button>
+            <button style="background:none;border:none;color:#888;font-size:0.85rem;cursor:pointer;margin-top:10px;width:100%;padding:8px;" onclick="fecharPopupResetSenha()">Cancelar</button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://ixnqcwilmvgzkxfmkfaq.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnFjd2lsbXZnemt4Zm1rZmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTQ1NTMsImV4cCI6MjA5NzczMDU1M30.-LqUvPwThvgZw8T5iADZn-I3L-XJvmMFyVqD3rgToq8";
+        
+        const banco = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let jogos = [];
+        let usuarioAtual = null;
+        let valoresOriginais = {};
+        let valoresTemporarios = {};
+        let jogosFinalizados = new Set();
+        let jogosFinalizadosInicializado = false;
+        let ligaAtiva = null;
+        let minhasLigas = [];
+        let rankingVisivel = 'geral';
+
+        function jogoJaComecou(dataStr) {
+            return new Date() >= getDataJogo(dataStr);
+        }
+
+        function jogoFinalizadoPorTempo(dataStr) {
+            const inicio = getDataJogo(dataStr);
+            const fim = new Date(inicio.getTime() + 3 * 3600000);
+            return new Date() >= fim;
+        }
+
+        function getDataJogo(dataStr) {
+            const partes = dataStr.split(' - ');
+            const dataParts = partes[0].split('/');
+            const dia = parseInt(dataParts[0]);
+            const mes = parseInt(dataParts[1]) - 1;
+            const hora = partes[1] || '00:00';
+            return new Date(2026, mes, dia, ...hora.split(':'));
+        }
+
+        function salvarInputsTemporarios() {
+            valoresTemporarios = {};
+            if (!jogos) return;
+            jogos.forEach(jogo => {
+                const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                if (p1 && p2) {
+                    valoresTemporarios[`${jogo.id}_p1`] = p1.value;
+                    valoresTemporarios[`${jogo.id}_p2`] = p2.value;
+                }
+            });
+        }
+
+        function restaurarInputsTemporarios() {
+            if (Object.keys(valoresTemporarios).length === 0) return;
+            jogos.forEach(jogo => {
+                const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                if (p1 && p2) {
+                    const tmp1 = valoresTemporarios[`${jogo.id}_p1`];
+                    const tmp2 = valoresTemporarios[`${jogo.id}_p2`];
+                    if (tmp1 !== undefined && p1.value !== tmp1) p1.value = tmp1;
+                    if (tmp2 !== undefined && p2.value !== tmp2) p2.value = tmp2;
+                }
+            });
+            valoresTemporarios = {};
+            // valoresOriginais já foi definido pelo carregarJogosEJogadores com os valores do BD
+            // Só compara para atualizar o botão
+            atualizarEstadoBotao();
+        }
+
+        function rotuloJogo(jogo) {
+            if (jogo.grupo?.startsWith('Grupo')) return `${jogo.grupo} • ${jogo.data}`;
+            return jogo.grupo || jogo.data || '';
+        }
+
+        function abrirTutorialInstalacao() {
+            fecharMenu();
+            document.getElementById('popup-tutorial').style.display = 'flex';
+        }
+
+        function fecharTutorialInstalacao() {
+            document.getElementById('popup-tutorial').style.display = 'none';
+        }
+
+        let passoOnboarding = 1;
+        const totalOnboarding = 5;
+        function mostrarPassoOnboarding(passo) {
+            document.querySelectorAll('.onb-slide').forEach(s => s.classList.remove('ativo'));
+            document.querySelector(`.onb-slide[data-step="${passo}"]`).classList.add('ativo');
+            document.querySelectorAll('.onb-dot').forEach((d, i) => d.classList.toggle('ativo', i === passo - 1));
+            document.getElementById('btn-onb-ant').style.visibility = passo === 1 ? 'hidden' : 'visible';
+            document.getElementById('btn-onb-prox').textContent = passo === totalOnboarding ? 'Concluir ✓' : 'Próximo →';
+            passoOnboarding = passo;
+        }
+        function onboardingProximo() {
+            if (passoOnboarding >= totalOnboarding) { fecharOnboarding(); return; }
+            mostrarPassoOnboarding(passoOnboarding + 1);
+        }
+        function onboardingAnterior() {
+            if (passoOnboarding <= 1) return;
+            mostrarPassoOnboarding(passoOnboarding - 1);
+        }
+        async function fecharOnboarding() {
+            document.getElementById('popup-onboarding').style.display = 'none';
+            await banco.auth.updateUser({ data: { tutorial_visto: true } });
+        }
+
+        function mudarAbaTutorial(sistema) {
+            if(sistema === 'android') {
+                document.getElementById('btn-tab-android').classList.add('ativo');
+                document.getElementById('btn-tab-ios').classList.remove('ativo');
+                document.getElementById('passos-android').style.display = 'block';
+                document.getElementById('passos-ios').style.display = 'none';
+            } else {
+                document.getElementById('btn-tab-ios').classList.add('ativo');
+                document.getElementById('btn-tab-android').classList.remove('ativo');
+                document.getElementById('passos-ios').style.display = 'block';
+                document.getElementById('passos-android').style.display = 'none';
+            }
+        }
+
+        function abrirMenu() {
+            document.getElementById('menu-overlay').style.display = 'block';
+            setTimeout(() => { document.getElementById('menu-lateral').classList.add('aberto'); }, 10);
+            renderizarMinhasLigasMenu();
+        }
+
+        function renderizarMinhasLigasMenu() {
+            const container = document.getElementById('lista-minhas-ligas');
+            if (!container) return;
+            if (minhasLigas.length === 0) {
+                container.innerHTML = '<div style="font-size:0.75rem;color:#888;text-align:center;padding:4px;">Nenhuma liga ainda</div>';
+                return;
+            }
+            container.innerHTML = minhasLigas.map(l => `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;font-size:0.8rem;">
+                    <span><strong>${l.nome}</strong> <span style="color:#888;font-size:0.7rem;">${l.codigo}</span></span>
+                    <button onclick="sairDaLiga('${l.id}')" style="background:none;border:none;color:#d93025;font-size:0.7rem;cursor:pointer;">Sair</button>
+                </div>
+            `).join('');
+        }
+
+        function fecharMenu() {
+            document.getElementById('menu-lateral').classList.remove('aberto');
+            setTimeout(() => { document.getElementById('menu-overlay').style.display = 'none'; }, 300);
+        }
+
+        function fecharPopupAviso() {
+            document.getElementById('popup-aviso').style.display = 'none';
+        }
+
+        function abrirPopupLigaInfo() { document.getElementById('popup-liga-info').style.display = 'flex'; }
+        function fecharPopupLigaInfo() {
+            document.getElementById('popup-liga-info').style.display = 'none';
+            localStorage.setItem('liga_info_visto', 'true');
+        }
+
+        async function salvarNovoNome() {
+            const novoNome = document.getElementById('input-mudar-nome').value.trim();
+            if (!novoNome) return alert("Digite um nome válido!");
+
+            const { error: erroPerfil } = await banco.from('perfis').update({ nome: novoNome }).eq('id', usuarioAtual.id);
+            if (erroPerfil) return alert("Erro ao atualizar nome: " + erroPerfil.message);
+
+            await banco.auth.updateUser({ data: { nome: novoNome } });
+
+            alert("Nome atualizado com sucesso!");
+            document.getElementById('usuario-saudacao').innerText = `Olá, ${novoNome}!`;
+            document.getElementById('input-mudar-nome').value = '';
+            fecharMenu();
+            calcularEAtualizarRankingGeral();
+        }
+
+        function abrirPopupResetSenha() {
+            document.getElementById('popup-reset-senha').style.display = 'flex';
+            document.getElementById('reset-email').value = document.getElementById('login-email').value;
+        }
+        function fecharPopupResetSenha() {
+            document.getElementById('popup-reset-senha').style.display = 'none';
+        }
+        async function enviarResetSenha() {
+            const email = document.getElementById('reset-email').value.trim();
+            if (!email) return alert("Digite seu e-mail!");
+            const { error } = await banco.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+            if (error) return alert("Erro: " + error.message);
+            alert("Link de redefinição enviado para " + email + "! Verifique sua caixa de entrada.");
+            fecharPopupResetSenha();
+        }
+
+        function alternarTelas(telaDesejada) {
+            if (telaDesejada === 'cadastro') {
+                document.getElementById('login-secao').style.display = 'none';
+                document.getElementById('cadastro-secao').style.display = 'block';
+            } else {
+                document.getElementById('cadastro-secao').style.display = 'none';
+                document.getElementById('login-secao').style.display = 'block';
+            }
+        }
+
+        async function verificarSessao() {
+            const { data: { session } } = await banco.auth.getSession();
+            if (session) {
+                usuarioAtual = session.user;
+                mostrarPainelJogo();
+            } else {
+                mostrarPainelLogin();
+            }
+        }
+
+        async function fazerLogin() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            if (!email || !password) return alert("Preencha e-mail e senha!");
+
+            const { data, error } = await banco.auth.signInWithPassword({ email, password });
+            if (error) return alert("Erro no login. Verifique seu e-mail e senha.");
+            
+            usuarioAtual = data.user;
+            mostrarPainelJogo();
+        }
+
+        async function fazerCadastro() {
+            const nome = document.getElementById('cadastro-nome').value;
+            const email = document.getElementById('cadastro-email').value;
+            const password = document.getElementById('cadastro-password').value;
+            if (!nome || !email || !password) return alert("Preencha todos os campos!");
+
+            const { data, error } = await banco.auth.signUp({
+                email, password, options: { data: { nome: nome, tutorial_visto: false } }
+            });
+            if (error) return alert("Erro real: " + JSON.stringify(error));
+
+            alert("Conta criada com sucesso! Entre agora usando seu e-mail e senha.");
+            document.getElementById('login-email').value = email;
+            document.getElementById('login-password').value = '';
+            document.getElementById('cadastro-nome').value = '';
+            document.getElementById('cadastro-email').value = '';
+            document.getElementById('cadastro-password').value = '';
+            alternarTelas('login');
+        }
+
+        async function deslogar() {
+            fecharMenu();
+            if (intervaloAuto) clearInterval(intervaloAuto);
+            await banco.auth.signOut();
+            usuarioAtual = null;
+            document.getElementById('login-password').value = '';
+            mostrarPainelLogin();
+        }
+
+        function mostrarPainelLogin() {
+            document.getElementById('cadastro-secao').style.display = 'none';
+            document.getElementById('jogo-secao').style.display = 'none';
+            document.getElementById('login-secao').style.display = 'block';
+        }
+
+        let intervaloAuto = null;
+
+        async function mostrarPainelJogo() {
+            document.getElementById('login-secao').style.display = 'none';
+            document.getElementById('cadastro-secao').style.display = 'none';
+            document.getElementById('jogo-secao').style.display = 'block';
+            
+            const { data } = await banco.from('perfis').select('nome, pontos_bonus').eq('id', usuarioAtual.id).single();
+            document.getElementById('usuario-saudacao').innerText = `Olá, ${data ? data.nome : 'Jogador'}!`;
+            if (data && data.pontos_bonus) usuarioAtual.pontos_bonus = data.pontos_bonus;
+
+            if (usuarioAtual.user_metadata?.tutorial_visto === false) {
+                passoOnboarding = 1;
+                mostrarPassoOnboarding(1);
+                document.getElementById('popup-onboarding').style.display = 'flex';
+            }
+
+            await carregarJogosEJogadores();
+            await carregarPalpitesFiltro();
+            await carregarMinhasLigas();
+
+            if (!localStorage.getItem('liga_info_visto')) {
+                setTimeout(abrirPopupLigaInfo, 1000);
+            }
+
+            banco.channel('notificacoes')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacoes' }, (payload) => {
+                    document.getElementById('popup-texto-data').innerText = payload.new.mensagem;
+                    document.getElementById('popup-aviso').style.display = 'flex';
+                })
+                .subscribe();
+
+            // Sincronizar resultados automaticamente a cada 30 segundos
+            if (intervaloAuto) clearInterval(intervaloAuto);
+            sincronizarAuto();
+            intervaloAuto = setInterval(sincronizarAuto, 30000);
+
+            // Real-time: quando alguém alterar resultados no banco, atualiza na tela
+            banco.channel('jogos-rt')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'jogos' }, () => {
+                    salvarInputsTemporarios();
+                    carregarJogosEJogadores();
+                })
+                .subscribe();
+        }
+
+        async function sincronizarAuto() {
+            console.log('[AutoSync] Rodando sincronização automática...');
+            try {
+                const resp = await fetch('https://worldcup26.ir/get/games');
+                if (!resp.ok) { console.warn('[AutoSync] API retornou status', resp.status); return; }
+                const data = await resp.json();
+                const matches = data.games || [];
+                console.log('[AutoSync] Partidas recebidas da API:', matches.length);
+                const { data: todosJogos } = await banco.from('jogos').select('*');
+                if (!todosJogos) { console.warn('[AutoSync] Nenhum jogo no banco'); return; }
+
+                await importarMataMataAPI();
+                const { data: todosJogosAtual } = await banco.from('jogos').select('*');
+                if (todosJogosAtual) todosJogos = todosJogosAtual;
+                let atualizados = 0;
+                jogosFinalizados = new Set();
+                for (const match of matches) {
+                    const partesData = match.local_date.split(' ');
+                    const dParts = partesData[0].split('/');
+                    const hParts = partesData[1] ? partesData[1].split(':') : ['0','0'];
+                    const dataJogo = new Date(parseInt(dParts[2]), parseInt(dParts[0])-1, parseInt(dParts[1]), parseInt(hParts[0]), parseInt(hParts[1]));
+                    if (dataJogo > new Date()) continue;
+                    const gc = parseInt(match.home_score);
+                    const gf = parseInt(match.away_score);
+                    if (isNaN(gc) || isNaN(gf)) continue;
+                    const timeCasa = en2pt[match.home_team_name_en] || match.home_team_name_en;
+                    const timeFora = en2pt[match.away_team_name_en] || match.away_team_name_en;
+                    const grupoMatch = match.type === 'group' ? '' : (tipoParaFase[match.type] || '');
+                    const jogoBD = todosJogos.find(j => {
+                        const mesmoTime = (j.time1 === timeCasa && j.time2 === timeFora) || (j.time1 === timeFora && j.time2 === timeCasa);
+                        if (!mesmoTime) return false;
+                        if (grupoMatch && j.grupo !== grupoMatch) return false;
+                        return true;
+                    });
+                    if (!jogoBD) { console.log('[AutoSync] Jogo não encontrado no BD:', timeCasa, 'x', timeFora); continue; }
+                    if (match.finished === 'TRUE') jogosFinalizados.add(jogoBD.id);
+                    const res1 = jogoBD.time1 === timeCasa ? gc : gf;
+                    const res2 = jogoBD.time1 === timeCasa ? gf : gc;
+                    if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+                        const updateData = { res1, res2 };
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
+                        } catch (e) {}
+                        try {
+                            await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                        } catch (e) {
+                            delete updateData.home_scorers; delete updateData.away_scorers;
+                            await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                        }
+                        atualizados++;
+                    } else {
+                        // Sync scorers even if score unchanged
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
+                            const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
+                            if ((hs || null) !== hsBD || (as || null) !== asBD) {
+                                try {
+                                    await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id);
+                                } catch (e) {}
+                            }
+                        } catch (e) {}
+                    }
+                }
+                jogosFinalizadosInicializado = true;
+                if (atualizados > 0) console.log('[AutoSync] Atualizados:', atualizados);
+                salvarInputsTemporarios();
+                await carregarJogosEJogadores();
+            } catch (e) { console.error('[AutoSync] Erro:', e); }
+        }
+
+        const tipoParaFase = { r32: '16 Avos', r16: 'Oitavas', qf: 'Quartas', sf: 'Semifinais', third: 'Disputa de 3º Lugar', final: 'Final' };
+        const horariosBrasilia = (function(){
+            const h = {};
+            const add = (t1, t2, data) => { h[t1+'|'+t2] = data; h[t2+'|'+t1] = data; };
+            add('África do Sul','Canadá','28/06 - 16:00');
+            add('Brasil','Japão','29/06 - 14:00');
+            add('Alemanha','Paraguai','29/06 - 17:30');
+            add('Países Baixos','Marrocos','29/06 - 22:00');
+            add('Costa do Marfim','Noruega','30/06 - 14:00');
+            add('França','Suécia','30/06 - 18:00');
+            add('México','Equador','30/06 - 22:00');
+            add('Inglaterra','RD Congo','01/07 - 13:00');
+            add('Bélgica','Senegal','01/07 - 17:00');
+            add('Estados Unidos','Bósnia e Herzegovina','01/07 - 21:00');
+            add('Espanha','Áustria','02/07 - 16:00');
+            add('Portugal','Croácia','02/07 - 20:00');
+            add('Suíça','Argélia','03/07 - 00:00');
+            add('Austrália','Egito','03/07 - 15:00');
+            add('Argentina','Cabo Verde','03/07 - 19:00');
+            add('Colômbia','Gana','03/07 - 22:30');
+            add('Canadá','Marrocos','04/07 - 14:00');
+            add('Paraguai','França','04/07 - 18:00');
+            add('Brasil','Noruega','05/07 - 17:00');
+            add('México','Inglaterra','05/07 - 21:00');
+            add('Portugal','Espanha','06/07 - 16:00');
+            add('Estados Unidos','Bélgica','06/07 - 21:00');
+            add('Argentina','Egito','07/07 - 13:00');
+            add('Suíça','Colômbia','07/07 - 17:00');
+            add('França','Marrocos','09/07 - 17:00');
+            add('Espanha','Bélgica','10/07 - 16:00');
+            add('Noruega','Inglaterra','11/07 - 18:00');
+            add('Argentina','Suíça','11/07 - 22:00');
+            return h;
+        })();
+
+        const stadiumOffset = {
+            1: { city: "New York", utcOffset: -4 },
+            2: { city: "Los Angeles", utcOffset: -7 },
+            3: { city: "Dallas", utcOffset: -5 },
+            4: { city: "Miami", utcOffset: -4 },
+            5: { city: "Atlanta", utcOffset: -4 },
+            6: { city: "Seattle", utcOffset: -7 },
+            7: { city: "Houston", utcOffset: -5 },
+            8: { city: "Kansas City", utcOffset: -5 },
+            9: { city: "Boston", utcOffset: -4 },
+            10: { city: "Philadelphia", utcOffset: -4 },
+            11: { city: "San Francisco", utcOffset: -7 },
+            12: { city: "Guadalajara", utcOffset: -6 },
+            13: { city: "Monterrey", utcOffset: -6 },
+            14: { city: "Mexico City", utcOffset: -6 },
+            15: { city: "Toronto", utcOffset: -4 },
+            16: { city: "Vancouver", utcOffset: -7 }
+        };
+
+        function converterStadiumParaBrasilia(match) {
+            if (!match || !match.local_date) return null;
+            const offset = match.stadium_id ? stadiumOffset[match.stadium_id] : null;
+            if (!offset) return null;
+            const [datePart, timePart] = match.local_date.split(' ');
+            if (!datePart || !timePart) return null;
+            const [month, day, year] = datePart.split('/');
+            const [hour, minute] = timePart.split(':');
+            const localUtc = Date.UTC(+year, +month - 1, +day, +hour - offset.utcOffset, +minute);
+            const brasilia = new Date(localUtc - 3 * 3600000);
+            return `${String(brasilia.getUTCDate()).padStart(2,'0')}/${String(brasilia.getUTCMonth() + 1).padStart(2,'0')} - ${String(brasilia.getUTCHours()).padStart(2,'0')}:${String(brasilia.getUTCMinutes()).padStart(2,'0')}`;
+        }
+
+        function getDataBrasilia(time1, time2, apiData, match) {
+            if (time1 && time2) {
+                const h = horariosBrasilia[time1+'|'+time2];
+                if (h) return h;
+            }
+            if (match) {
+                const s = converterStadiumParaBrasilia(match);
+                if (s) return s;
+            }
+            return apiData;
+        }
+
+        function parseScorers(str) {
+            if (!str || str === 'null' || str === '[]') return [];
+            try { return JSON.parse(str); } catch (e) {}
+            const m = str.match(/"([^"]+)"/g);
+            return m ? m.map(s => s.replace(/"/g, '')) : [];
+        }
+        function formatScorers(str) {
+            const arr = parseScorers(str);
+            return arr.length ? arr.map(s => '⚽ ' + s).join(', ') : '';
+        }
+
+        async function importarMataMata() {
+            const el = document.getElementById('status-import');
+            if (el) el.innerText = '🔄 Importando...';
+            const qtd = await importarMataMataAPI();
+            if (el) el.innerText = qtd > 0 ? `✅ ${qtd} jogo(s) importado(s)` : '✅ Nenhum novo jogo';
+            if (qtd > 0) {
+                salvarInputsTemporarios();
+                await carregarJogosEJogadores();
+            }
+        }
+
+        async function importarMataMataAPI() {
+            try {
+                console.log('[ImportMM] Buscando jogos da API...');
+                const resp = await fetch('https://worldcup26.ir/get/games');
+                if (!resp.ok) { console.error('[ImportMM] API status:', resp.status); return 0; }
+                const data = await resp.json();
+                const matches = data.games || [];
+                const knockouts = matches.filter(m => tipoParaFase[m.type]);
+                console.log('[ImportMM] Jogos mata-mata:', knockouts.length);
+                const { data: existentes, error: errEx } = await banco.from('jogos').select('id, time1, time2, grupo, res1, res2, home_scorers, away_scorers');
+                if (errEx) { console.error('[ImportMM] Erro select:', errEx); return 0; }
+                function ehPlaceholder(t) { return !t || t === 'A definir' || t.includes('Winner') || t.includes('Vencedor'); }
+                let importados = 0;
+                for (const match of knockouts) {
+                    const timeCasa = match.home_team_name_en ? (en2pt[match.home_team_name_en] || match.home_team_name_en) : null;
+                    const timeFora = match.away_team_name_en ? (en2pt[match.away_team_name_en] || match.away_team_name_en) : null;
+                    const grupo = tipoParaFase[match.type];
+                    const jogosNoGrupo = existentes?.filter(j => j.grupo === grupo) || [];
+
+                    // 1) Exact match (both teams, any order) → sync scores + fix time
+                    if (timeCasa && timeFora) {
+                        const exato = jogosNoGrupo.find(j =>
+                            (j.time1 === timeCasa && j.time2 === timeFora) || (j.time1 === timeFora && j.time2 === timeCasa)
+                        );
+                        if (exato) {
+                            await atualizarResultadoSePrecisar(exato, match, timeCasa, timeFora);
+                            await corrigirDataSePrecisar(exato, timeCasa, timeFora, match);
+                            continue;
+                        }
+                    }
+
+                    // 2) Partial match: try to match by one known team
+                    let achado = null;
+                    const updateFields = {};
+                    for (const j of jogosNoGrupo) {
+                        if (timeCasa && j.time1 === timeCasa && (ehPlaceholder(j.time2) || (timeFora && j.time2 !== timeFora))) {
+                            if (timeFora && ehPlaceholder(j.time2)) updateFields.time2 = timeFora;
+                            achado = j; break;
+                        }
+                        if (timeFora && j.time2 === timeFora && (ehPlaceholder(j.time1) || (timeCasa && j.time1 !== timeCasa))) {
+                            if (timeCasa && ehPlaceholder(j.time1)) updateFields.time1 = timeCasa;
+                            achado = j; break;
+                        }
+                        if (timeCasa && j.time2 === timeCasa && (ehPlaceholder(j.time1) || (timeFora && j.time1 !== timeFora))) {
+                            if (timeFora && ehPlaceholder(j.time1)) updateFields.time1 = timeFora;
+                            achado = j; break;
+                        }
+                        if (timeFora && j.time1 === timeFora && (ehPlaceholder(j.time2) || (timeCasa && j.time2 !== timeCasa))) {
+                            if (timeCasa && ehPlaceholder(j.time2)) updateFields.time2 = timeCasa;
+                            achado = j; break;
+                        }
+                    }
+
+                    // 3) No partial match, but both teams known → take first placeholder in group
+                    if (!achado && timeCasa && timeFora) {
+                        const ph = jogosNoGrupo.find(j => ehPlaceholder(j.time1) && ehPlaceholder(j.time2));
+                        if (ph) {
+                            updateFields.time1 = timeCasa;
+                            updateFields.time2 = timeFora;
+                            achado = ph;
+                        }
+                    }
+
+                    if (achado) {
+                        if (Object.keys(updateFields).length > 0) {
+                            await banco.from('jogos').update(updateFields).eq('id', achado.id);
+                            console.log('[ImportMM] Atualizado jogo', achado.id, ':', JSON.stringify(updateFields));
+                            importados++;
+                        }
+                        if (timeCasa && timeFora) {
+                            await atualizarResultadoSePrecisar(achado, match, timeCasa, timeFora);
+                        }
+                        const t1corrigido = timeCasa || achado.time1;
+                        const t2corrigido = timeFora || achado.time2;
+                        if (t1corrigido && t2corrigido) await corrigirDataSePrecisar(achado, t1corrigido, t2corrigido, match);
+                        continue;
+                    }
+
+                    // 4) Both teams known and no match, OR no match for this grupo at all → insert new
+                    if (jogosNoGrupo.length === 0 || (timeCasa && timeFora)) {
+                        const partes = match.local_date.split(' ');
+                        const dataApi = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
+                        const dataFormatada = getDataBrasilia(timeCasa, timeFora, dataApi, match);
+                        const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
+                        const novoId = (maxId?.[0]?.id || 0) + 1;
+                        const insertData = { id: novoId, grupo, data: dataFormatada, time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null };
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            if (hs || as) { insertData.home_scorers = hs; insertData.away_scorers = as; }
+                        } catch (e) {}
+                        const { error: errIns } = await banco.from('jogos').insert(insertData);
+                        if (errIns) { console.error('[ImportMM] Erro insert:', errIns); continue; }
+                        console.log('[ImportMM] Inserido:', novoId, grupo, timeCasa || 'A definir', 'x', timeFora || 'A definir', dataFormatada);
+                        importados++;
+                    }
+                }
+                console.log('[ImportMM] Total importados/atualizados:', importados);
+                return importados;
+            } catch (e) { console.error('[ImportMM] Erro:', e);
+                const el = document.getElementById('status-import');
+                if (el) el.innerText = '❌ Erro ao importar: ' + e.message;
+                return 0; }
+        }
+
+        async function corrigirDataSePrecisar(jogoBD, t1, t2, match) {
+            const correta = getDataBrasilia(t1, t2, null, match);
+            if (correta && jogoBD.data !== correta) {
+                await banco.from('jogos').update({ data: correta }).eq('id', jogoBD.id);
+                console.log('[ImportMM] Data corrigida:', jogoBD.id, jogoBD.data, '→', correta);
+            }
+        }
+
+        async function atualizarResultadoSePrecisar(jogoBD, match, timeCasa, timeFora) {
+            const gc = parseInt(match.home_score);
+            const gf = parseInt(match.away_score);
+            if (isNaN(gc) || isNaN(gf)) return;
+            const res1 = jogoBD.time1 === timeCasa ? gc : gf;
+            const res2 = jogoBD.time1 === timeCasa ? gf : gc;
+            if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+                const updateData = { res1, res2 };
+                try {
+                    const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                    const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                    if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
+                } catch (e) {}
+                try {
+                    await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                } catch (e) {
+                    delete updateData.home_scorers; delete updateData.away_scorers;
+                    await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                }
+            } else {
+                try {
+                    const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                    const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                    const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
+                    const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
+                    if ((hs || null) !== hsBD || (as || null) !== asBD) {
+                        try { await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id); } catch (e) {}
+                    }
+                } catch (e) {}
+            }
+        }
+
+        async function carregarJogosEJogadores() {
+            try {
+                const { data: jogosDoBanco, error: erroJogos } = await banco
+                    .from('jogos')
+                    .select('*')
+                    .order('id', { ascending: true });
+
+                if (erroJogos) throw erroJogos;
+                
+                jogos = jogosDoBanco;
+
+                // Limpar resultados de jogos que ainda não começaram
+                for (const j of jogos) {
+                    if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
+                        try {
+                            await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null }).eq('id', j.id);
+                        } catch (e) {
+                            await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
+                        }
+                        j.res1 = null; j.res2 = null;
+                        if (j.home_scorers !== undefined) { j.home_scorers = null; j.away_scorers = null; }
+                    }
+                }
+
+                const { data: palpitesSalvos } = await banco
+                    .from('palpites')
+                    .select('*')
+                    .eq('usuario_id', usuarioAtual.id);
+
+                const container = document.getElementById('container-jogos');
+                container.innerHTML = '';
+
+                const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
+                const hoje = new Date();
+                const hojeDDMM = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`;
+                const ehMataMataHoje = hoje >= new Date(2026, 5, 28);
+                let diaAtivo = diasUnicos.find(d => d === hojeDDMM);
+                if (!diaAtivo) {
+                    // Se não tem jogo hoje, pega o primeiro dia futuro mais próximo
+                    const hojeNum = hoje.getFullYear() * 10000 + (hoje.getMonth()+1) * 100 + hoje.getDate();
+                    let maisProximo = null, menorDiff = Infinity;
+                    for (const d of diasUnicos) {
+                        const p = d.split('/');
+                        const dNum = 2026 * 10000 + parseInt(p[1]) * 100 + parseInt(p[0]);
+                        const diff = dNum - hojeNum;
+                        if (diff >= 0 && diff < menorDiff) { menorDiff = diff; maisProximo = d; }
+                    }
+                    diaAtivo = maisProximo || diasUnicos[0];
+                }
+
+                const tabsContainer = document.getElementById('dias-tabs');
+                tabsContainer.innerHTML = '';
+
+                const fasesMataMata = [...new Set(jogos.filter(j => !j.grupo.startsWith('Grupo')).map(j => j.grupo))];
+                const fasesOrdem = ['16 Avos', 'Oitavas', 'Quartas', 'Semifinais', 'Disputa de 3º Lugar', 'Final'];
+                fasesMataMata.sort((a, b) => fasesOrdem.indexOf(a) - fasesOrdem.indexOf(b));
+                const ehMataMata = fasesMataMata.length > 0;
+
+                function limparAbas() {
+                    document.querySelectorAll('#dias-tabs .tab-btn').forEach(b => b.classList.remove('ativo'));
+                    document.querySelectorAll('.grupo-btn').forEach(b => b.classList.remove('ativo'));
+                }
+
+                function mostrarContainerJogos() {
+                    document.getElementById('container-jogos').style.display = '';
+                    document.getElementById('container-fase').style.display = 'none';
+                }
+
+                // Criar abas de dia - prioriza config do admin no banco, depois localStorage
+                let diasVisiveis = null;
+                try {
+                    const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
+                    if (data?.valor) diasVisiveis = JSON.parse(data.valor);
+                } catch (e) {
+                    const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+                    if (local) diasVisiveis = local;
+                }
+                const diasParaMostrar = diasVisiveis || diasUnicos;
+                diasUnicos.filter(d => diasParaMostrar.includes(d)).forEach(dia => {
+                        const btn = document.createElement('button');
+                        btn.className = `tab-btn ${dia === diaAtivo ? 'ativo' : ''}`;
+                        btn.innerText = `Dia ${dia}`;
+                        btn.onclick = () => {
+                            limparAbas();
+                            btn.classList.add('ativo');
+                            mostrarContainerJogos();
+                            document.getElementById('grupo-tabs').style.display = 'none';
+                            filtrarJogosNaTela(dia);
+                            abaAtiva = 'dia';
+                        };
+                        tabsContainer.appendChild(btn);
+                    });
+
+                // Se existir mata-mata, adicionar abas de fase ao final
+                if (ehMataMata) {
+                    fasesMataMata.forEach(fase => {
+                        const btn = document.createElement('button');
+                        btn.className = 'tab-btn';
+                        btn.innerText = fase;
+                        btn.onclick = () => {
+                            limparAbas();
+                            btn.classList.add('ativo');
+                            document.getElementById('container-jogos').style.display = 'none';
+                            document.getElementById('container-fase').style.display = 'block';
+                            document.getElementById('grupo-tabs').style.display = 'none';
+                            const jogosFase = jogos.filter(j => j.grupo === fase).sort((a, b) => {
+                                return getDataJogo(a.data).getTime() - getDataJogo(b.data).getTime();
+                            });
+                            let html = '';
+                            jogosFase.forEach(j => {
+                                const palpite = palpitesSalvos?.find(p => p.jogo_id === j.id);
+                                const p1Value = palpite ? palpite.palpite_time1 : '';
+                                const p2Value = palpite ? palpite.palpite_time2 : '';
+                                const encerrado = jogoJaComecou(j.data);
+                                const disabledAttr = encerrado ? 'disabled' : '';
+                                const temResultado = j.res1 !== null && j.res2 !== null;
+                                let classeCard = '';
+                                if (temResultado && p1Value !== '' && p2Value !== '') {
+                                    const p1 = parseInt(p1Value), p2 = parseInt(p2Value);
+                                    if (p1 === j.res1 && p2 === j.res2) classeCard = 'acerto-exato';
+                                    else if ((p1 > p2 && j.res1 > j.res2) || (p1 < p2 && j.res1 < j.res2) || (p1 === p2 && j.res1 === j.res2)) classeCard = 'acerto-vencedor';
+                                    else classeCard = 'erro-total';
+                                }
+                                let infoLinha = `${ehMataMataHoje ? '* ' : ''}${fase} • ${j.data}`;
+                                if (temResultado) infoLinha += ` | (Real: ${j.time1} ${j.res1} x ${j.res2} ${j.time2})`;
+                                const temPalpiteFase = p1Value !== '' && p2Value !== '';
+                                const ehFinalizadoFase = (jogosFinalizadosInicializado && jogosFinalizados.has(j.id)) || jogoFinalizadoPorTempo(j.data);
+                                const ehAoVivoFase = temResultado && encerrado && !ehFinalizadoFase;
+                                let labelFase = '';
+                                if (ehAoVivoFase) labelFase = '<div style="font-size:0.75rem;color:#dc3545;text-align:center;margin-top:5px;"><span class="live-indicator"></span>AO VIVO</div>';
+                                else if (temResultado) labelFase = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Encerrado</div>';
+                                else if (encerrado) labelFase = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Palpite encerrado</div>';
+                                const btnLimparFase = !encerrado && temPalpiteFase
+                                    ? `<button class="btn-limpar" onclick="limparPalpite(${j.id})" title="Limpar palpite">✕ Limpar</button>` : '';
+                                html += `<div class="jogo-card ${classeCard}" style="display:flex;flex-direction:column;padding:10px;margin:6px 0;border-radius:8px;">`;
+                                html += `<div style="font-size:0.75rem;color:#888;text-align:center;">${infoLinha}</div>`;
+                                html += `<div class="placar-container"><div class="time mandante">${j.time1}</div>`;
+                                html += `<input type="number" id="jogo_${j.id}_p1" min="0" value="${p1Value}" ${disabledAttr}>`;
+                                html += `<span>X</span>`;
+                                html += `<input type="number" id="jogo_${j.id}_p2" min="0" value="${p2Value}" ${disabledAttr}>`;
+                                html += `<div class="time visitante">${j.time2}</div></div>`;
+                                const golsCasa = j.home_scorers ? formatScorers(j.home_scorers) : '';
+                                const golsFora = j.away_scorers ? formatScorers(j.away_scorers) : '';
+                                if (golsCasa || golsFora) {
+                                    html += `<div class="placar-container" style="margin-top:-4px;">`;
+                                    html += `<div class="time-scorers left">${golsCasa}</div><div></div><div></div><div></div><div class="time-scorers right">${golsFora}</div>`;
+                                    html += `</div>`;
+                                }
+                                html += `<div style="display:flex;justify-content:space-between;align-items:center;min-height:20px;">`;
+                                html += `<div>${btnLimparFase}</div>`;
+                                html += labelFase;
+                                html += '</div></div>';
+                            });
+                            if (ehMataMataHoje) html += `<div style="font-size:0.7rem;color:#888;text-align:center;margin-top:5px;">* Em caso de prorrogação, vale o resultado dos 90 minutos</div>`;
+                            document.getElementById('container-fase').innerHTML = html;
+                            jogosFase.forEach(j => {
+                                const p1 = document.getElementById(`jogo_${j.id}_p1`);
+                                const p2 = document.getElementById(`jogo_${j.id}_p2`);
+                                if (p1 && p2) {
+                                    valoresOriginais[`${j.id}_p1`] = p1.value;
+                                    valoresOriginais[`${j.id}_p2`] = p2.value;
+                                    p1.oninput = p2.oninput = atualizarEstadoBotao;
+                                }
+                            });
+                            atualizarEstadoBotao();
+                            abaAtiva = 'fase';
+                        };
+                        tabsContainer.appendChild(btn);
+                    });
+                }
+
+                // Abas de grupos (só aparecem quando clica em "Grupo X" no ranking)
+                const gruposUnicos = [...new Set(jogos.filter(j => j.grupo.startsWith('Grupo')).map(j => j.grupo))];
+                const gruposContainer = document.getElementById('grupo-tabs');
+                gruposContainer.innerHTML = '';
+                const btnVoltarDia = document.createElement('button');
+                btnVoltarDia.className = 'tab-btn';
+                btnVoltarDia.innerText = '⬅ Voltar';
+                btnVoltarDia.onclick = () => {
+                    document.getElementById('grupo-tabs').style.display = 'none';
+                    mostrarContainerJogos();
+                    limparAbas();
+                    const primeiroTab = document.querySelector('#dias-tabs .tab-btn');
+                    if (primeiroTab) primeiroTab.click();
+                };
+                gruposContainer.appendChild(btnVoltarDia);
+                gruposUnicos.forEach(grupo => {
+                    const btn = document.createElement('button');
+                    btn.className = 'tab-btn grupo-btn';
+                    btn.id = `grupo-btn-${grupo}`;
+                    btn.innerText = grupo;
+                    btn.onclick = () => alternarAbaGrupo(grupo);
+                    gruposContainer.appendChild(btn);
+                });
+                // Ativar aba: Quartas como padrão
+                const tabQuartas = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === 'Quartas');
+                if (tabQuartas) tabQuartas.click();
+                else {
+                    const p = document.querySelector('#dias-tabs .tab-btn');
+                    if (p) p.click();
+                }
+
+                jogos.forEach(jogo => {
+                    if (!jogo.grupo.startsWith('Grupo')) return;
+                    const palpite = palpitesSalvos ? palpitesSalvos.find(p => p.jogo_id === jogo.id) : null;
+                    const p1Value = palpite ? palpite.palpite_time1 : '';
+                    const p2Value = palpite ? palpite.palpite_time2 : '';
+
+                    let statusJogo = rotuloJogo(jogo);
+                    let classeResultado = '';
+
+                    if (jogo.res1 !== null && jogo.res2 !== null) {
+                        statusJogo += ` | (Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
+                        
+                        if (palpite !== undefined && palpite !== null && p1Value !== '' && p2Value !== '') {
+                            const p1 = parseInt(p1Value), p2 = parseInt(p2Value);
+                            const r1 = jogo.res1, r2 = jogo.res2;
+
+                            if (p1 === r1 && p2 === r2) { classeResultado = 'acerto-exato'; } 
+                            else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { classeResultado = 'acerto-vencedor'; } 
+                            else { classeResultado = 'erro-total'; }
+                        } else { classeResultado = 'erro-total'; }
+                    }
+
+                    const diaDoJogo = jogo.data.split(' - ')[0];
+                    const encerrado = jogoJaComecou(jogo.data);
+                    const disabledAttr = encerrado ? 'disabled' : '';
+                    const temResultado = jogo.res1 !== null && jogo.res2 !== null;
+                    const temPalpite = p1Value !== '' && p2Value !== '';
+                    const ehFinalizado = (jogosFinalizadosInicializado && jogosFinalizados.has(jogo.id)) || jogoFinalizadoPorTempo(jogo.data);
+                    const ehAoVivo = temResultado && encerrado && !ehFinalizado;
+                    const liveClass = ehAoVivo ? 'jogo-ao-vivo' : '';
+
+                    let labelEncerrado = '';
+                    if (ehAoVivo) {
+                        labelEncerrado = '<div style="font-size:0.75rem;color:#dc3545;text-align:center;margin-top:5px;"><span class="live-indicator"></span>AO VIVO</div>';
+                    } else if (encerrado && temResultado) {
+                        labelEncerrado = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Encerrado</div>';
+                    } else if (encerrado && !temResultado) {
+                        labelEncerrado = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Palpite encerrado</div>';
+                    }
+
+                    const btnLimpar = !encerrado && temPalpite
+                        ? `<button class="btn-limpar" onclick="limparPalpite(${jogo.id})" title="Limpar palpite">✕ Limpar</button>`
+                        : '';
+
+                    const card = `
+                        <div class="jogo-card jogo-dia ${classeResultado} ${liveClass}" data-dia="${diaDoJogo}" data-grupo="${jogo.grupo}">
+                            <div class="info-jogo">${statusJogo}</div>
+                            <div class="placar-container">
+                                <div class="time mandante">${jogo.time1}</div>
+                                <input type="number" id="jogo_${jogo.id}_p1" min="0" value="${p1Value}" ${disabledAttr}>
+                                <span>X</span>
+                                <input type="number" id="jogo_${jogo.id}_p2" min="0" value="${p2Value}" ${disabledAttr}>
+                                <div class="time visitante">${jogo.time2}</div>
+                            </div>
+                            ${(jogo.home_scorers || jogo.away_scorers) ? `
+                            <div class="placar-container" style="margin-top:-4px;">
+                                <div class="time-scorers left">${formatScorers(jogo.home_scorers)}</div>
+                                <div></div><div></div><div></div>
+                                <div class="time-scorers right">${formatScorers(jogo.away_scorers)}</div>
+                            </div>` : ''}
+                            <div style="display:flex;justify-content:space-between;align-items:center;min-height:20px;">
+                                <div>${btnLimpar}</div>
+                                ${labelEncerrado}
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+
+                filtrarJogosNaTela(diaAtivo);
+                calcularEAtualizarRankingGeral();
+
+                valoresOriginais = {};
+                jogos.forEach(jogo => {
+                    const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                    const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                    if (p1 && p2) {
+                        valoresOriginais[`${jogo.id}_p1`] = p1.value;
+                        valoresOriginais[`${jogo.id}_p2`] = p2.value;
+                        p1.oninput = p2.oninput = atualizarEstadoBotao;
+                    }
+                });
+                restaurarInputsTemporarios();
+                
+            } catch (e) { console.error("Erro ao carregar do banco:", e); }
+        }
+
+        function filtrarJogosNaTela(diaDesejado) {
+            if (document.getElementById('grupo-tabs').style.display === 'flex') return;
+            document.querySelectorAll('.jogo-dia').forEach(card => {
+                card.style.display = (card.getAttribute('data-dia') === diaDesejado) ? 'flex' : 'none';
+            });
+        }
+
+        function atualizarEstadoBotao() {
+            const btn = document.getElementById('btn-salvar');
+            let alterou = false;
+            jogos.forEach(jogo => {
+                const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                if (p1 && p2 && (p1.value !== valoresOriginais[`${jogo.id}_p1`] || p2.value !== valoresOriginais[`${jogo.id}_p2`])) {
+                    alterou = true;
+                }
+            });
+            if (alterou) {
+                btn.classList.remove('desativado');
+            } else {
+                btn.classList.add('desativado');
+            }
+        }
+
+        async function salvarPalpitesNoBanco() {
+            const listaPalpites = [];
+
+            jogos.forEach(jogo => {
+                if (jogoJaComecou(jogo.data)) return;
+                const inputP1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                const inputP2 = document.getElementById(`jogo_${jogo.id}_p2`);
+
+                if (inputP1 && inputP2 && inputP1.value !== '' && inputP2.value !== '') {
+                    listaPalpites.push({
+                        usuario_id: usuarioAtual.id, jogo_id: jogo.id,
+                        palpite_time1: parseInt(inputP1.value), palpite_time2: parseInt(inputP2.value)
+                    });
+                }
+            });
+
+            if (listaPalpites.length === 0) return alert("Digite pelo menos um palpite!");
+
+            const { error } = await banco.from('palpites').upsert(listaPalpites, { onConflict: 'usuario_id,jogo_id' });
+
+            if (error) {
+                alert("Erro ao salvar palpites: " + error.message);
+            } else {
+                alert("Seus palpites foram salvos na nuvem com sucesso!");
+                jogos.forEach(jogo => {
+                    const p1 = document.getElementById(`jogo_${jogo.id}_p1`);
+                    const p2 = document.getElementById(`jogo_${jogo.id}_p2`);
+                    if (p1 && p2) {
+                        valoresOriginais[`${jogo.id}_p1`] = p1.value;
+                        valoresOriginais[`${jogo.id}_p2`] = p2.value;
+                    }
+                });
+                atualizarEstadoBotao();
+                calcularEAtualizarRankingGeral();
+                await carregarJogosEJogadores();
+            }
+        }
+
+        async function calcularEAtualizarRankingGeral() {
+            const { data: todosPerfis } = await banco.from('perfis').select('id, nome, pontos_bonus');
+            const { data: todosPalpites } = await banco.from('palpites').select('*');
+
+            if (!todosPerfis) return;
+
+            let tabelaRanking = [];
+
+            if (ligaAtiva) {
+                tabelaRanking = await calcularRankingLiga(todosPerfis, todosPalpites);
+            } else {
+                todosPerfis.forEach(perfil => {
+                    let pontosDoUsuario = 0;
+                    const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
+
+                    jogos.forEach(jogo => {
+                        if (jogo.res1 === null || jogo.res2 === null) return;
+                        const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
+                        if (!palpite) return;
+
+                        const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                        const r1 = jogo.res1, r2 = jogo.res2;
+
+                        if (p1 === r1 && p2 === r2) { pontosDoUsuario += 5; } 
+                        else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { pontosDoUsuario += 3; }
+                    });
+
+                    pontosDoUsuario += perfil.pontos_bonus || 0;
+                    tabelaRanking.push({ nome: perfil.nome, pontos: pontosDoUsuario, id: perfil.id });
+                });
+                tabelaRanking.sort((a, b) => b.pontos - a.pontos);
+            }
+
+            const divRanking = document.getElementById('tabela-ranking');
+            divRanking.innerHTML = '';
+            const expandido = divRanking.dataset.expandido === 'true';
+
+            tabelaRanking.forEach((item, index) => {
+                const ehVoce = item.id === usuarioAtual.id ? 'voce' : '';
+                const oculto = index >= 3 && !expandido && !ehVoce ? 'style="display:none;"' : '';
+                const click = ehVoce ? '' : ` onclick="verAcertosDe('${item.id}','${item.nome}')" style="cursor:pointer;"`;
+                divRanking.innerHTML += `
+                    <div class="ranking-linha ${ehVoce}" ${oculto}${click}>
+                        <div><strong>${index + 1}º</strong> ${item.nome}</div>
+                        <div>${item.pontos} pts</div>
+                    </div>
+                `;
+            });
+
+            if (tabelaRanking.length > 3) {
+                divRanking.innerHTML += `
+                    <div style="text-align:center;margin-top:8px;">
+                        <button onclick="alternarRanking()" style="background:none;border:none;color:var(--primary);font-weight:bold;cursor:pointer;font-size:0.85rem;">
+                            ${expandido ? '▲ Mostrar menos' : '▼ Ver todos (' + tabelaRanking.length + ')'}
+                        </button>
+                    </div>
+                `;
+            }
+            renderizarTabsRanking();
+        }
+
+        // --- Liga functions ---
+        async function carregarMinhasLigas() {
+            if (!usuarioAtual) return;
+            const { data: membro } = await banco.from('liga_membros').select('liga_id, ligas(id, nome, codigo)').eq('usuario_id', usuarioAtual.id);
+            minhasLigas = membro ? membro.map(m => m.ligas) : [];
+            renderizarTabsRanking();
+        }
+
+        function renderizarTabsRanking() {
+            const container = document.querySelector('.ranking-container');
+            if (!container) return;
+            const header = container.querySelector('div');
+            if (!header) return;
+            let tabsDiv = document.getElementById('ranking-tabs');
+            if (!tabsDiv) {
+                tabsDiv = document.createElement('div');
+                tabsDiv.id = 'ranking-tabs';
+                tabsDiv.className = 'ranking-tabs';
+                header.after(tabsDiv);
+            }
+            let html = `<div class="ranking-tab ${rankingVisivel === 'geral' ? 'ativo' : ''}" onclick="mudarRanking('geral')">📊 Geral</div>`;
+            minhasLigas.forEach(liga => {
+                const isAtivo = rankingVisivel === 'liga_' + liga.id;
+                html += `<div class="ranking-tab ${isAtivo ? 'ativo' : ''}" onclick="mudarRanking('liga_${liga.id}')">🏆 ${liga.nome}</div>`;
+            });
+            tabsDiv.innerHTML = html;
+        }
+
+        async function mudarRanking(tipo) {
+            rankingVisivel = tipo;
+            if (tipo === 'geral') {
+                ligaAtiva = null;
+                document.querySelector('.ranking-titulo').innerHTML = '📊 Classificação Geral';
+            } else {
+                const ligaId = tipo.replace('liga_', '');
+                ligaAtiva = minhasLigas.find(l => l.id === ligaId);
+                document.querySelector('.ranking-titulo').innerHTML = `🏆 ${ligaAtiva.nome} <span class="liga-tag">${ligaAtiva.codigo}</span>`;
+            }
+            renderizarTabsRanking();
+            await calcularEAtualizarRankingGeral();
+        }
+
+        async function calcularRankingLiga(perfis, palpites) {
+            const { data: membros } = await banco.from('liga_membros').select('usuario_id, joined_at').eq('liga_id', ligaAtiva.id);
+            if (!membros || membros.length === 0) return [];
+            const { data: ajustes } = await banco.from('league_score_adjustments').select('usuario_id, pontos').eq('liga_id', ligaAtiva.id);
+            const ajustesPorUser = {};
+            if (ajustes) ajustes.forEach(a => { ajustesPorUser[a.usuario_id] = (ajustesPorUser[a.usuario_id] || 0) + a.pontos; });
+            const tabelaRanking = [];
+            perfis.filter(p => membros.some(m => m.usuario_id === p.id)).forEach(perfil => {
+                const membro = membros.find(m => m.usuario_id === perfil.id);
+                const dataEntrada = new Date(membro.joined_at);
+                let pontosDoUsuario = 0;
+                const palpitesDoUsuario = palpites ? palpites.filter(p => p.usuario_id === perfil.id) : [];
+                jogos.forEach(jogo => {
+                    if (jogo.res1 === null || jogo.res2 === null) return;
+                    const dataJogo = getDataJogo(jogo.data);
+                    if (dataJogo < dataEntrada) return;
+                    const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
+                    if (!palpite) return;
+                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                    const r1 = jogo.res1, r2 = jogo.res2;
+                    if (p1 === r1 && p2 === r2) pontosDoUsuario += 5;
+                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontosDoUsuario += 3;
+                });
+                pontosDoUsuario += ajustesPorUser[perfil.id] || 0;
+                tabelaRanking.push({ nome: perfil.nome, pontos: pontosDoUsuario, id: perfil.id });
+            });
+            return tabelaRanking.sort((a, b) => b.pontos - a.pontos);
+        }
+
+        function gerarCodigoLiga() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let codigo = '';
+            for (let i = 0; i < 4; i++) codigo += chars[Math.floor(Math.random() * chars.length)];
+            return codigo;
+        }
+
+        async function criarLiga() {
+            const nome = prompt("Nome da liga:");
+            if (!nome || !nome.trim()) return;
+            const codigo = gerarCodigoLiga();
+            const { data, error } = await banco.from('ligas').insert({ nome: nome.trim(), codigo, criador_id: usuarioAtual.id }).select().single();
+            if (error) { alert("Erro ao criar liga: " + error.message + "\n\nExecute no SQL Editor:\n" + getSQLLigas()); return; }
+            await banco.from('liga_membros').insert({ liga_id: data.id, usuario_id: usuarioAtual.id });
+            alert(`Liga "${nome}" criada!\nCódigo: ${codigo}\nCompartilhe o código para outros entrarem.`);
+            await carregarMinhasLigas();
+        }
+
+        async function entrarNaLiga() {
+            const codigo = prompt("Digite o código da liga (4 caracteres):");
+            if (!codigo || !codigo.trim()) return;
+            const { data: liga } = await banco.from('ligas').select('id, nome, codigo').eq('codigo', codigo.trim().toUpperCase()).single();
+            if (!liga) return alert("Liga não encontrada! Verifique o código.");
+            const { data: jaExiste } = await banco.from('liga_membros').select('id').eq('liga_id', liga.id).eq('usuario_id', usuarioAtual.id).single();
+            if (jaExiste) return alert("Você já está nesta liga!");
+            const { error } = await banco.from('liga_membros').insert({ liga_id: liga.id, usuario_id: usuarioAtual.id });
+            if (error) { alert("Erro ao entrar na liga: " + error.message + "\n\nExecute no SQL Editor:\n" + getSQLLigas()); return; }
+            alert(`Você entrou na liga "${liga.nome}"!`);
+            await carregarMinhasLigas();
+        }
+
+        async function sairDaLiga(ligaId) {
+            if (!confirm("Tem certeza que deseja sair desta liga?")) return;
+            await banco.from('liga_membros').delete().eq('liga_id', ligaId).eq('usuario_id', usuarioAtual.id);
+            if (ligaAtiva && ligaAtiva.id === ligaId) {
+                rankingVisivel = 'geral';
+                ligaAtiva = null;
+            }
+            await carregarMinhasLigas();
+            await calcularEAtualizarRankingGeral();
+        }
+
+        function getSQLLigas() {
+            return `CREATE TABLE IF NOT EXISTS ligas (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                nome TEXT NOT NULL,
+                codigo TEXT UNIQUE NOT NULL,
+                criador_id UUID REFERENCES auth.users(id),
+                created_at TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE TABLE IF NOT EXISTS liga_membros (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                liga_id UUID REFERENCES ligas(id) ON DELETE CASCADE,
+                usuario_id UUID REFERENCES auth.users(id),
+                joined_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(liga_id, usuario_id)
+            );
+            CREATE TABLE IF NOT EXISTS league_score_adjustments (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                liga_id UUID REFERENCES ligas(id) ON DELETE CASCADE,
+                usuario_id UUID REFERENCES auth.users(id),
+                pontos INTEGER NOT NULL,
+                justificativa TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE TABLE IF NOT EXISTS configuracoes (
+                chave TEXT PRIMARY KEY,
+                valor TEXT
+            );`;
+        }
+
+        async function criarTabelasLigas() {
+            const el = document.getElementById('status-ligas');
+            if (!el) return;
+            el.innerText = '🔄 Criando tabelas...';
+            const sql = getSQLLigas();
+            try {
+                const sess = await banco.auth.getSession();
+                const token = sess.data.session?.access_token;
+                if (token) {
+                    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ query: sql })
+                    });
+                    if (r.ok) { el.innerText = '✅ Tabelas criadas!'; return; }
+                }
+            } catch (e) {}
+            el.innerHTML = `❌ Execute no <a href="https://supabase.com/dashboard/project/ixnqcwilmvgzkxfmkfaq/sql/new" target="_blank">SQL Editor do Supabase</a>:<br><br><code style="font-size:0.7rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
+        }
+
+        async function criarTabelaAjustes() {
+            const el = document.getElementById('status-ajustes');
+            if (!el) return;
+            el.innerText = '🔄 Criando tabela...';
+            const sql = "CREATE TABLE IF NOT EXISTS league_score_adjustments (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, liga_id UUID REFERENCES ligas(id) ON DELETE CASCADE, usuario_id UUID REFERENCES auth.users(id), pontos INTEGER NOT NULL, justificativa TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now()); ALTER TABLE league_score_adjustments DISABLE ROW LEVEL SECURITY;";
+            try {
+                const sess = await banco.auth.getSession();
+                const token = sess.data.session?.access_token;
+                if (token) {
+                    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ query: sql })
+                    });
+                    if (r.ok) { el.innerText = '✅ Tabela criada!'; return; }
+                }
+            } catch (e) {}
+            el.innerHTML = `❌ Execute no SQL Editor:<br><br><code style="font-size:0.7rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
+        }
+
+        async function carregarLigasParaAjuste() {
+            const el = document.getElementById('lista-ajustes');
+            if (!el) return;
+            el.innerHTML = 'Carregando...';
+            const { data: ligas } = await banco.from('ligas').select('id, nome, codigo');
+            const { data: perfis } = await banco.from('perfis').select('id, nome');
+            const { data: membros } = await banco.from('liga_membros').select('liga_id, usuario_id');
+            const { data: ajustes } = await banco.from('league_score_adjustments').select('usuario_id, liga_id, pontos');
+            if (!ligas || !perfis || !membros) { el.innerHTML = '<div style="color:#888;">Erro ao carregar dados.</div>'; return; }
+            const nomePorId = {}; perfis.forEach(p => { nomePorId[p.id] = p.nome; });
+            const ajustesPorUserLiga = {};
+            if (ajustes) ajustes.forEach(a => { const k = a.usuario_id+'|'+a.liga_id; ajustesPorUserLiga[k] = (ajustesPorUserLiga[k] || 0) + a.pontos; });
+            let html = '';
+            for (const liga of ligas) {
+                const membrosDaLiga = membros.filter(m => m.liga_id === liga.id);
+                if (membrosDaLiga.length === 0) continue;
+                html += `<div style="font-weight:bold;font-size:0.85rem;color:var(--primary);margin:10px 0 4px;">🏆 ${liga.nome} (${liga.codigo})</div>`;
+                membrosDaLiga.forEach(m => {
+                    const nome = nomePorId[m.usuario_id] || 'Desconhecido';
+                    const k = m.usuario_id+'|'+liga.id;
+                    const totalAjuste = ajustesPorUserLiga[k] || 0;
+                    const ajusteStr = totalAjuste !== 0 ? ` <span style="color:${totalAjuste > 0 ? '#28a745' : '#d93025'};">(${totalAjuste > 0 ? '+' : ''}${totalAjuste})</span>` : '';
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #eee;font-size:0.8rem;">
+                        <span>${nome}${ajusteStr}</span>
+                        <button onclick="abrirModalAjuste('${m.usuario_id}','${liga.id}','${nome.replace(/'/g, "\\'")}','${liga.nome.replace(/'/g, "\\'")}')" style="padding:4px 8px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;">⚖️ Ajustar</button>
+                    </div>`;
+                });
+            }
+            el.innerHTML = html || '<div style="color:#888;">Nenhum membro em ligas.</div>';
+        }
+
+        function abrirModalAjuste(usuarioId, ligaId, nomeUsuario, nomeLiga) {
+            document.getElementById('conteudo-ajuste').innerHTML = `
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:0.9rem;margin-bottom:4px;"><strong>Usuário:</strong> ${nomeUsuario}</div>
+                    <div style="font-size:0.9rem;margin-bottom:4px;"><strong>Liga:</strong> ${nomeLiga}</div>
+                    <div style="font-size:0.9rem;margin-bottom:12px;"><strong>Pontos atuais na liga:</strong> <span id="pontos-atuais-ajuste">calculando...</span></div>
+                    <label style="font-size:0.85rem;font-weight:bold;display:block;margin-bottom:4px;">Pontos (+ ou -):</label>
+                    <input type="number" id="campo-pontos-ajuste" value="0" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;box-sizing:border-box;margin-bottom:10px;">
+                    <label style="font-size:0.85rem;font-weight:bold;display:block;margin-bottom:4px;">Justificativa (obrigatória):</label>
+                    <textarea id="campo-justificativa-ajuste" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;box-sizing:border-box;margin-bottom:12px;min-height:60px;resize:vertical;" placeholder="Ex: Entrou na liga durante o jogo, pontuação deve ser válida"></textarea>
+                    <button onclick="salvarAjuste('${usuarioId}','${ligaId}')" style="width:100%;padding:10px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.9rem;">💾 Salvar Ajuste</button>
+                </div>
+                <div id="historico-ajustes" style="margin-top:8px;max-height:150px;overflow-y:auto;font-size:0.8rem;"></div>
+            `;
+            document.getElementById('popup-ajuste').style.display = 'flex';
+            carregarPontosAtuaisLiga(usuarioId, ligaId);
+            carregarHistoricoAjustes(usuarioId, ligaId);
+        }
+
+        function fecharPopupAjuste() {
+            document.getElementById('popup-ajuste').style.display = 'none';
+        }
+
+        async function carregarPontosAtuaisLiga(usuarioId, ligaId) {
+            const el = document.getElementById('pontos-atuais-ajuste');
+            if (!el) return;
+            const { data: jogosDoBanco } = await banco.from('jogos').select('*');
+            if (!jogosDoBanco) { el.innerText = '0'; return; }
+            const { data: todosPalpites } = await banco.from('palpites').select('*').eq('usuario_id', usuarioId);
+            const { data: membro } = await banco.from('liga_membros').select('joined_at').eq('usuario_id', usuarioId).eq('liga_id', ligaId).single();
+            const dataEntrada = membro ? new Date(membro.joined_at) : new Date(0);
+            let pontos = 0;
+            jogosDoBanco.forEach(jogo => {
+                if (jogo.res1 === null || jogo.res2 === null) return;
+                const dataJogo = getDataJogo(jogo.data);
+                if (dataJogo < dataEntrada) return;
+                const palpite = todosPalpites?.find(p => p.jogo_id === jogo.id);
+                if (!palpite) return;
+                const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                const r1 = jogo.res1, r2 = jogo.res2;
+                if (p1 === r1 && p2 === r2) pontos += 5;
+                else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontos += 3;
+            });
+            const { data: ajustes } = await banco.from('league_score_adjustments').select('pontos').eq('usuario_id', usuarioId).eq('liga_id', ligaId);
+            if (ajustes) ajustes.forEach(a => pontos += a.pontos);
+            el.innerText = pontos;
+        }
+
+        async function carregarHistoricoAjustes(usuarioId, ligaId) {
+            const el = document.getElementById('historico-ajustes');
+            if (!el) return;
+            const { data: ajustes } = await banco.from('league_score_adjustments')
+                .select('pontos, justificativa, created_at')
+                .eq('usuario_id', usuarioId)
+                .eq('liga_id', ligaId)
+                .order('created_at', { ascending: false });
+            if (!ajustes || ajustes.length === 0) { el.innerHTML = '<div style="color:#aaa;">Nenhum ajuste anterior.</div>'; return; }
+            let html = '<div style="font-weight:bold;font-size:0.8rem;color:#666;margin-bottom:4px;">Histórico de ajustes:</div>';
+            ajustes.forEach(a => {
+                const sinal = a.pontos > 0 ? '+' : '';
+                html += `<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;">
+                    <span style="color:${a.pontos >= 0 ? '#28a745' : '#d93025'};">${sinal}${a.pontos}</span>
+                    <span style="color:#888;"> — ${a.justificativa}</span>
+                </div>`;
+            });
+            el.innerHTML = html;
+        }
+
+        async function salvarAjuste(usuarioId, ligaId) {
+            const pontos = parseInt(document.getElementById('campo-pontos-ajuste').value);
+            const justificativa = document.getElementById('campo-justificativa-ajuste').value.trim();
+            if (isNaN(pontos) || pontos === 0) { alert("Informe um valor diferente de zero."); return; }
+            if (!justificativa) { alert("Justificativa é obrigatória."); return; }
+            const { error } = await banco.from('league_score_adjustments').insert({
+                liga_id: ligaId, usuario_id: usuarioId, pontos, justificativa
+            });
+            if (error) { alert('Erro: ' + error.message); return; }
+            alert('Ajuste salvo!');
+            carregarPontosAtuaisLiga(usuarioId, ligaId);
+            carregarHistoricoAjustes(usuarioId, ligaId);
+            await calcularEAtualizarRankingGeral();
+        }
+
+        async function carregarParaAdicionarPalpite() {
+            const el = document.getElementById('area-adicionar-palpite');
+            if (!el) return;
+            el.innerHTML = 'Carregando...';
+            const { data: perfis } = await banco.from('perfis').select('id, nome');
+            const { data: todosJogos } = await banco.from('jogos').select('id, time1, time2, data, grupo').order('id', { ascending: true });
+            if (!perfis || !todosJogos) { el.innerHTML = '<div style="color:#888;">Erro ao carregar.</div>'; return; }
+            let html = `
+                <label style="font-size:0.8rem;font-weight:bold;display:block;margin-bottom:4px;">Usuário:</label>
+                <select id="sel-user-palpite" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;margin-bottom:8px;box-sizing:border-box;">
+                    <option value="">Selecione...</option>
+                    ${perfis.map(p => `<option value="${p.id}">${p.nome}</option>`).join('')}
+                </select>
+                <label style="font-size:0.8rem;font-weight:bold;display:block;margin-bottom:4px;">Jogo:</label>
+                <select id="sel-jogo-palpite" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;margin-bottom:8px;box-sizing:border-box;">
+                    <option value="">Selecione...</option>
+                    ${todosJogos.map(j => `<option value="${j.id}">${j.grupo} - ${j.time1} x ${j.time2} (${j.data})</option>`).join('')}
+                </select>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.8rem;font-weight:bold;display:block;margin-bottom:4px;">Palpite Time 1:</label>
+                        <input type="number" id="adm-palpite-t1" min="0" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.8rem;font-weight:bold;display:block;margin-bottom:4px;">Palpite Time 2:</label>
+                        <input type="number" id="adm-palpite-t2" min="0" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;box-sizing:border-box;">
+                    </div>
+                </div>
+                <button onclick="salvarPalpiteAdmin()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">💾 Salvar Palpite</button>
+                <div id="status-palpite-admin" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+            `;
+            el.innerHTML = html;
+        }
+
+        async function salvarPalpiteAdmin() {
+            const el = document.getElementById('status-palpite-admin');
+            if (!el) return;
+            const usuarioId = document.getElementById('sel-user-palpite').value;
+            const jogoId = document.getElementById('sel-jogo-palpite').value;
+            const t1 = document.getElementById('adm-palpite-t1').value;
+            const t2 = document.getElementById('adm-palpite-t2').value;
+            if (!usuarioId || !jogoId || t1 === '' || t2 === '') { alert("Preencha todos os campos!"); return; }
+            el.innerText = '🔄 Salvando...';
+            const { error } = await banco.from('palpites').upsert(
+                { usuario_id: usuarioId, jogo_id: parseInt(jogoId), palpite_time1: parseInt(t1), palpite_time2: parseInt(t2) },
+                { onConflict: 'usuario_id,jogo_id' }
+            );
+            if (error) { el.innerText = '❌ Erro: ' + error.message; return; }
+            el.innerText = '✅ Palpite salvo!';
+            await calcularEAtualizarRankingGeral();
+        }
+
+        function abrirPopupFiltros() {
+            document.getElementById('popup-filtros').style.display = 'flex';
+            mudarAbaFiltro('cravada');
+        }
+        function fecharPopupFiltros() {
+            document.getElementById('popup-filtros').style.display = 'none';
+        }
+        function mudarAbaFiltro(tipo) {
+            document.querySelectorAll('#popup-filtros .t-tab-btn').forEach(b => b.classList.remove('ativo'));
+            document.getElementById('filtro-tab-' + tipo).classList.add('ativo');
+
+            const div = document.getElementById('lista-filtros');
+            div.innerHTML = '';
+            let total = 0;
+
+            const jogosOrdenados = [...jogos].sort((a, b) => getDataJogo(b.data).getTime() - getDataJogo(a.data).getTime());
+            jogosOrdenados.forEach(jogo => {
+                if (jogo.res1 === null || jogo.res2 === null) return;
+                const palpite = palpitesSalvosFiltro ? palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id) : null;
+                if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
+
+                const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                const r1 = jogo.res1, r2 = jogo.res2;
+                let categoria = 'errou';
+                if (p1 === r1 && p2 === r2) categoria = 'cravada';
+                else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) categoria = 'acertou';
+
+                if (categoria !== tipo) return;
+                total++;
+
+                div.innerHTML += `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;gap:8px;">
+                        <div style="flex:1;min-width:0;">
+                            <strong>${jogo.time1}</strong> vs <strong>${jogo.time2}</strong>
+                            <div style="font-size:0.75rem;color:#888;">${rotuloJogo(jogo)}</div>
+                        </div>
+                        <div style="text-align:right;white-space:nowrap;">
+                            Seu: ${p1}-${p2}<br>
+                            <span style="color:#666;">Real: ${r1}-${r2}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (total === 0) {
+                div.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">Nenhum resultado nessa categoria ainda.</div>';
+            }
+        }
+        let palpitesSalvosFiltro = [];
+        async function carregarPalpitesFiltro() {
+            const { data } = await banco.from('palpites').select('*').eq('usuario_id', usuarioAtual.id);
+            palpitesSalvosFiltro = data || [];
+        }
+
+        function alternarRanking() {
+            const div = document.getElementById('tabela-ranking');
+            div.dataset.expandido = div.dataset.expandido === 'true' ? 'false' : 'true';
+            calcularEAtualizarRankingGeral();
+        }
+
+        async function compartilharRanking() {
+            const div = document.getElementById('tabela-ranking');
+            div.dataset.expandido = 'true';
+            await calcularEAtualizarRankingGeral();
+            await new Promise(r => setTimeout(r, 200));
+
+            const container = div.parentElement;
+            const original = container.style.borderRadius;
+            container.style.borderRadius = '12px';
+            container.style.overflow = 'hidden';
+
+            try {
+                const canvas = await html2canvas(container, {
+                    backgroundColor: '#ffffff', scale: 2, useCORS: true,
+                    logging: false, width: container.scrollWidth, height: container.scrollHeight
+                });
+                container.style.borderRadius = original;
+                container.style.overflow = '';
+
+                canvas.toBlob(blob => {
+                    if (!blob) return alert("Erro ao gerar imagem.");
+                    if (navigator.share && navigator.canShare({ files: [new File([blob], 'ranking.png', { type: 'image/png' })] })) {
+                        navigator.share({ files: [new File([blob], 'ranking.png', { type: 'image/png' })], title: 'Classificação Geral' });
+                    } else {
+                        const link = document.createElement('a');
+                        link.download = 'classificacao_bolao.png';
+                        link.href = URL.createObjectURL(blob);
+                        link.click();
+                        URL.revokeObjectURL(link.href);
+                    }
+                });
+            } catch (e) {
+                container.style.borderRadius = original;
+                container.style.overflow = '';
+                alert("Erro ao gerar imagem: " + e.message);
+            } finally {
+                div.dataset.expandido = 'false';
+                await calcularEAtualizarRankingGeral();
+            }
+        }
+
+        verificarSessao();
+
+        function fecharAdmin() {
+            document.getElementById('popup-admin').style.display = 'none';
+        }
+
+        async function adicionarColunasArtilheiros() {
+            const el = document.getElementById('status-artilheiros');
+            if (!el) return;
+            el.innerText = '🔄 Verificando...';
+            try {
+                const { data: teste } = await banco.from('jogos').select('home_scorers').limit(1);
+                if (teste && teste[0] && teste[0].hasOwnProperty('home_scorers')) {
+                    el.innerText = '✅ Colunas já existem!';
+                    return;
+                }
+            } catch (e) {}
+            const sql = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_scorers TEXT, ADD COLUMN IF NOT EXISTS away_scorers TEXT;`;
+            try {
+                const sess = await banco.auth.getSession();
+                const token = sess.data.session?.access_token;
+                if (token) {
+                    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ query: sql })
+                    });
+                    if (r.ok) { el.innerText = '✅ Colunas adicionadas!'; await carregarJogosEJogadores(); return; }
+                }
+            } catch (e) {}
+            el.innerHTML = `❌ Não foi possível adicionar automaticamente.<br><br>Copie e execute no <a href="https://supabase.com/dashboard/project/ixnqcwilmvgzkxfmkfaq/sql/new" target="_blank">SQL Editor do Supabase</a>:<br><br><code style="font-size:0.75rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
+        }
+
+        async function abrirEdicaoPontos() {
+            const container = document.getElementById('lista-usuarios-pontos');
+            if (!container) return;
+            container.innerHTML = '🔄 Carregando...';
+            const { data: perfis } = await banco.from('perfis').select('id, nome, pontos_bonus');
+            if (!perfis || perfis.length === 0) { container.innerHTML = 'Nenhum usuário encontrado.'; return; }
+
+            const { data: todosPalpites } = await banco.from('palpites').select('*');
+
+            container.innerHTML = '';
+            perfis.forEach(perfil => {
+                let pontos = 0;
+                const palpitesDoUsuario = todosPalpites ? todosPalpites.filter(p => p.usuario_id === perfil.id) : [];
+                jogos.forEach(jogo => {
+                    if (jogo.res1 === null || jogo.res2 === null) return;
+                    const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
+                    if (!palpite) return;
+                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                    const r1 = jogo.res1, r2 = jogo.res2;
+                    if (p1 === r1 && p2 === r2) pontos += 5;
+                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontos += 3;
+                });
+                const bonus = perfil.pontos_bonus || 0;
+                const total = pontos + bonus;
+                container.innerHTML += `
+                    <div style="padding:8px 0;border-bottom:1px solid #eee;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="flex:1;font-size:0.85rem;"><strong>${perfil.nome}</strong> — ${total} pts <span style="color:#888;font-size:0.75rem;">(base: ${pontos} + bônus: ${bonus})</span></span>
+                        </div>
+                        <div style="display:flex;gap:4px;margin-top:4px;">
+                            <input type="number" id="pontos_${perfil.id}" placeholder="+5 ou -3" style="width:80px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                            <button onclick="salvarPontosUsuario('${perfil.id}')" style="padding:4px 10px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;font-weight:bold;">Aplicar</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function salvarPontosUsuario(userId) {
+            const input = document.getElementById('pontos_' + userId);
+            if (!input) return;
+            const valor = parseInt(input.value);
+            if (isNaN(valor)) return alert("Digite um número! (ex: +5 ou -3)");
+            try {
+                const { data: perfil } = await banco.from('perfis').select('pontos_bonus').eq('id', userId).single();
+                const bonusAtual = (perfil && perfil.pontos_bonus) || 0;
+                const novoBonus = bonusAtual + valor;
+                const { error } = await banco.from('perfis').update({ pontos_bonus: novoBonus }).eq('id', userId);
+                if (error) throw error;
+                alert(`Bônus atualizado: ${bonusAtual} → ${novoBonus} (${valor >= 0 ? '+' : ''}${valor})`);
+                input.value = '';
+                await abrirEdicaoPontos();
+            } catch (e) {
+                alert("Erro: " + e.message + "\n\nExecute no SQL Editor:\nALTER TABLE perfis ADD COLUMN IF NOT EXISTS pontos_bonus INTEGER DEFAULT 0;");
+            }
+        }
+
+        function abrirAdmin() {
+            if (usuarioAtual.email !== 'vornesfelipe@gmail.com') {
+                return alert("Acesso negado!");
+            }
+
+            document.getElementById('popup-admin').style.display = 'flex';
+            renderizarListaJogosAdmin();
+        }
+
+        function renderizarListaJogosAdmin() {
+            const container = document.getElementById('lista-jogos-admin');
+            const select = document.getElementById('filtro-dia-admin');
+            container.innerHTML = '';
+
+            const dias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
+            dias.sort((a, b) => {
+                const [dA, mA] = a.split('/').map(Number);
+                const [dB, mB] = b.split('/').map(Number);
+                return mA - mB || dA - dB;
+            });
+
+            const selected = select.value || 'todos';
+            if (select.options.length === 0) {
+                select.innerHTML = '<option value="todos">Todos os dias</option>' + dias.map(d => `<option value="${d}">Dia ${d}</option>`).join('');
+            }
+
+            const filtrados = selected === 'todos' ? jogos : jogos.filter(j => j.data.startsWith(selected));
+
+            if (filtrados.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:#888;font-size:0.85rem;">Nenhum jogo.</div>';
+                return;
+            }
+
+            if (selected === 'todos') {
+                const agrupados = {};
+                filtrados.forEach(j => {
+                    const dia = j.data.split(' - ')[0];
+                    if (!agrupados[dia]) agrupados[dia] = [];
+                    agrupados[dia].push(j);
+                });
+                for (const dia of dias) {
+                    if (!agrupados[dia]) continue;
+                    container.innerHTML += `<div style="font-weight:bold;font-size:0.85rem;color:var(--primary);margin:10px 0 4px;">📅 Dia ${dia}</div>`;
+                    agrupados[dia].forEach(jogo => renderizarJogoAdmin(jogo));
+                }
+            } else {
+                filtrados.forEach(jogo => renderizarJogoAdmin(jogo));
+            }
+        }
+
+        function renderizarJogoAdmin(jogo) {
+            const container = document.getElementById('lista-jogos-admin');
+            container.innerHTML += `
+                <div style="margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid #eee;">
+                    <div style="font-size:0.75rem;color:#888;margin-bottom:2px;">${rotuloJogo(jogo)} • ID ${jogo.id}</div>
+                    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                        <input type="text" id="adm_t1_${jogo.id}" value="${jogo.time1}" style="flex:1;min-width:60px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                        <span style="font-size:0.8rem;">x</span>
+                        <input type="text" id="adm_t2_${jogo.id}" value="${jogo.time2}" style="flex:1;min-width:60px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                        <input type="number" id="adm_r1_${jogo.id}" value="${jogo.res1 !== null ? jogo.res1 : ''}" style="width:35px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                        <span style="font-size:0.8rem;">x</span>
+                        <input type="number" id="adm_r2_${jogo.id}" value="${jogo.res2 !== null ? jogo.res2 : ''}" style="width:35px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                        <button onclick="salvarResultadoAdmin(${jogo.id})" style="padding:4px 6px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;">💾</button>
+                        <button onclick="excluirJogoAdmin(${jogo.id})" style="padding:4px 6px;background:#d93025;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function salvarResultadoAdmin(id) {
+            const t1 = document.getElementById('adm_t1_'+id).value.trim();
+            const t2 = document.getElementById('adm_t2_'+id).value.trim();
+            const r1 = document.getElementById('adm_r1_'+id).value;
+            const r2 = document.getElementById('adm_r2_'+id).value;
+
+            const sess = await banco.auth.getSession();
+            const token = sess.data.session?.access_token;
+            if (!token) return alert("Sessão expirada. Refaça o login.");
+
+            const updateData = { time1: t1, time2: t2, res1: r1 !== '' ? parseInt(r1) : null, res2: r2 !== '' ? parseInt(r2) : null };
+            const resp = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(updateData)
+            });
+            const respText = await resp.text();
+
+            if (!resp.ok) {
+                let err;
+                try { err = JSON.parse(respText); } catch { err = { message: respText }; }
+                alert("Erro " + resp.status + ": " + (err.message || err) + (err.code ? " (Código: " + err.code + ")" : ""));
+                return;
+            }
+
+            alert("Jogo atualizado!");
+            fecharAdmin();
+            await carregarJogosEJogadores();
+        }
+
+        async function adicionarJogoAdmin() {
+            const grupo = document.getElementById('adm-novo-grupo').value;
+            const data = document.getElementById('adm-novo-data').value.trim();
+            const time1 = document.getElementById('adm-novo-time1').value.trim();
+            const time2 = document.getElementById('adm-novo-time2').value.trim();
+
+            if (!grupo || !data || !time1 || !time2) return alert("Preencha todos os campos!");
+
+            const { data: maxId } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
+            const novoId = (maxId && maxId.length > 0 ? maxId[0].id : 0) + 1;
+
+            const { error } = await banco.from('jogos').insert({
+                id: novoId, grupo, data, time1, time2, res1: null, res2: null
+            });
+
+            if (error) return alert("Erro ao adicionar: " + error.message);
+
+            document.getElementById('adm-novo-grupo').value = '';
+            document.getElementById('adm-novo-data').value = '';
+            document.getElementById('adm-novo-time1').value = '';
+            document.getElementById('adm-novo-time2').value = '';
+            await carregarJogosEJogadores();
+            renderizarListaJogosAdmin();
+            alert("Jogo adicionado!");
+        }
+
+        const en2pt = {
+            'Algeria': 'Argélia', 'Argentina': 'Argentina', 'Australia': 'Austrália',
+            'Austria': 'Áustria', 'Belgium': 'Bélgica', 'Bosnia and Herzegovina': 'Bósnia e Herzegovina',
+            'Brazil': 'Brasil', 'Canada': 'Canadá', 'Cape Verde': 'Cabo Verde',
+            'Colombia': 'Colômbia', 'Croatia': 'Croácia', 'Curaçao': 'Curaçao',
+            'Czech Republic': 'Tchéquia', 'Democratic Republic of the Congo': 'RD Congo',
+            'Ecuador': 'Equador', 'Egypt': 'Egito', 'England': 'Inglaterra',
+            'France': 'França', 'Germany': 'Alemanha', 'Ghana': 'Gana',
+            'Haiti': 'Haiti', 'Iran': 'Irã', 'Iraq': 'Iraque',
+            'Ivory Coast': 'Costa do Marfim', 'Japan': 'Japão', 'Jordan': 'Jordânia',
+            'Mexico': 'México', 'Morocco': 'Marrocos', 'Netherlands': 'Holanda',
+            'New Zealand': 'Nova Zelândia', 'Norway': 'Noruega', 'Panama': 'Panamá',
+            'Paraguay': 'Paraguai', 'Portugal': 'Portugal', 'Qatar': 'Catar',
+            'Saudi Arabia': 'Arábia Saudita', 'Scotland': 'Escócia', 'Senegal': 'Senegal',
+            'South Africa': 'África do Sul', 'South Korea': 'Coreia do Sul',
+            'Spain': 'Espanha', 'Sweden': 'Suécia', 'Switzerland': 'Suíça',
+            'Tunisia': 'Tunísia', 'Turkey': 'Turquia', 'United States': 'Estados Unidos',
+            'Uruguay': 'Uruguai', 'Uzbekistan': 'Uzbequistão'
+        };
+
+        async function renameTimeNoBanco() {
+            const oldName = document.getElementById('adm-rename-old').value.trim();
+            const newName = document.getElementById('adm-rename-new').value.trim();
+            if (!oldName || !newName) return alert("Preencha ambos os nomes!");
+            if (!confirm(`Renomear "${oldName}" para "${newName}" em todos os jogos?`)) return;
+
+            const { data: jogosParaRenomear } = await banco.from('jogos').select('id, time1, time2').or(`time1.eq.${oldName},time2.eq.${oldName}`);
+            if (!jogosParaRenomear || jogosParaRenomear.length === 0) return alert("Nenhum jogo encontrado com esse nome.");
+
+            for (const j of jogosParaRenomear) {
+                const updates = {};
+                if (j.time1 === oldName) updates.time1 = newName;
+                if (j.time2 === oldName) updates.time2 = newName;
+                await banco.from('jogos').update(updates).eq('id', j.id);
+            }
+
+            await carregarJogosEJogadores();
+            renderizarListaJogosAdmin();
+            alert(`${jogosParaRenomear.length} jogo(s) atualizado(s)!`);
+        }
+
+        async function sincronizarAPI() {
+            const status = document.getElementById('status-sync');
+            status.innerText = '🔄 Buscando partidas...';
+
+            try {
+                const resp = await fetch('https://worldcup26.ir/get/games');
+                if (!resp.ok) throw new Error('Erro HTTP ' + resp.status);
+
+                const data = await resp.json();
+                const matches = data.games || [];
+                const { data: todosJogos } = await banco.from('jogos').select('*');
+                await importarMataMataAPI();
+                let atualizados = 0, ignorados = 0;
+                jogosFinalizados = new Set();
+
+                for (const match of matches) {
+                    const partesData = match.local_date.split(' ');
+
+                    const dParts = partesData[0].split('/');
+                    const hParts = partesData[1] ? partesData[1].split(':') : ['0','0'];
+                    const dataJogo = new Date(parseInt(dParts[2]), parseInt(dParts[0])-1, parseInt(dParts[1]), parseInt(hParts[0]), parseInt(hParts[1]));
+                    if (dataJogo > new Date()) continue;
+
+                    const gc = parseInt(match.home_score);
+                    const gf = parseInt(match.away_score);
+                    if (isNaN(gc) || isNaN(gf)) continue;
+
+                    const timeCasa = en2pt[match.home_team_name_en] || match.home_team_name_en;
+                    const timeFora = en2pt[match.away_team_name_en] || match.away_team_name_en;
+
+                    const grupoMatch = match.type === 'group' ? '' : (tipoParaFase[match.type] || '');
+                    const jogoBD = todosJogos.find(j => {
+                        const mesmoTime = (j.time1 === timeCasa && j.time2 === timeFora) || (j.time1 === timeFora && j.time2 === timeCasa);
+                        if (!mesmoTime) return false;
+                        if (grupoMatch && j.grupo !== grupoMatch) return false;
+                        return true;
+                    });
+                    if (!jogoBD) { ignorados++; continue; }
+
+                    if (match.finished === 'TRUE') jogosFinalizados.add(jogoBD.id);
+
+                    const res1 = jogoBD.time1 === timeCasa ? gc : gf;
+                    const res2 = jogoBD.time1 === timeCasa ? gf : gc;
+
+                    if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+                        const updateData = { res1, res2 };
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
+                        } catch (e) {}
+                        try {
+                            await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                        } catch (e) {
+                            delete updateData.home_scorers; delete updateData.away_scorers;
+                            await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
+                        }
+                        atualizados++;
+                    } else {
+                        try {
+                            const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                            const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                            const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
+                            const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
+                            if ((hs || null) !== hsBD || (as || null) !== asBD) {
+                                try {
+                                    await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id);
+                                } catch (e) {}
+                            }
+                        } catch (e) {}
+                    }
+                }
+
+                const { data: todosApos } = await banco.from('jogos').select('*');
+                if (todosApos) {
+                    for (const j of todosApos) {
+                        if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
+                            try {
+                                await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null }).eq('id', j.id);
+                            } catch (e) {
+                                await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
+                            }
+                        }
+                    }
+                }
+
+                jogosFinalizadosInicializado = true;
+                status.innerText = `✅ ${atualizados} atualizado(s), ${ignorados} ignorado(s).`;
+                salvarInputsTemporarios();
+                await carregarJogosEJogadores();
+            } catch (e) {
+                status.innerText = '❌ Erro: ' + e.message;
+            }
+        }
+
+        async function notificarTodos() {
+            if (!confirm("Enviar notificação para todos os usuários?")) return;
+            const { error } = await banco.from('notificacoes').insert({ mensagem: 'Novos resultados oficiais foram adicionados pela banca do bolão! Venha conferir a classificação.' });
+            if (error) return alert("Erro: " + error.message);
+            alert("Notificação enviada!");
+        }
+
+        async function excluirJogoAdmin(id) {
+            if (!confirm("Tem certeza que deseja excluir este jogo?")) return;
+
+            const { error } = await banco.from('jogos').delete().eq('id', id);
+            if (error) return alert("Erro ao excluir: " + error.message);
+
+            await carregarJogosEJogadores();
+            renderizarListaJogosAdmin();
+        }
+        function atualizarApp() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(regs => {
+                    regs.forEach(r => r.unregister());
+                });
+            }
+            caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+            window.location.reload();
+        }
+
+        async function abrirPopupDias() {
+            fecharMenu();
+            const container = document.getElementById('lista-dias-popup');
+            container.innerHTML = 'Carregando...';
+            document.getElementById('popup-dias').style.display = 'flex';
+            const todosDias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
+            todosDias.sort((a, b) => {
+                const [dA, mA] = a.split('/').map(Number);
+                const [dB, mB] = b.split('/').map(Number);
+                return mA - mB || dA - dB;
+            });
+            let visiveis = todosDias;
+            try {
+                const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
+                if (data?.valor) visiveis = JSON.parse(data.valor);
+            } catch (e) {
+                const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+                if (local) visiveis = local;
+            }
+            container.innerHTML = '';
+            todosDias.forEach(dia => {
+                const checked = visiveis.includes(dia) ? 'checked' : '';
+                container.innerHTML += `
+                    <label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #eee;cursor:pointer;font-size:0.9rem;">
+                        <input type="checkbox" class="dia-check" value="${dia}" ${checked} style="width:18px;height:18px;">
+                        Dia ${dia}
+                    </label>
+                `;
+            });
+        }
+        function fecharPopupDias() {
+            document.getElementById('popup-dias').style.display = 'none';
+        }
+        async function salvarDiasVisiveis() {
+            const checks = document.querySelectorAll('.dia-check');
+            const selecionados = [];
+            checks.forEach(c => { if (c.checked) selecionados.push(c.value); });
+            const valor = selecionados.length === 0 || selecionados.length === checks.length ? null : JSON.stringify(selecionados);
+            try {
+                await banco.from('configuracoes').upsert(
+                    { chave: 'dias_visiveis', valor },
+                    { onConflict: 'chave' }
+                );
+            } catch (e) {
+                if (valor) localStorage.setItem('diasVisiveis', valor);
+                else localStorage.removeItem('diasVisiveis');
+            }
+            fecharPopupDias();
+            carregarJogosEJogadores();
+        }
+
+        async function corrigir16Avos() {
+            const el = document.getElementById('status-corrigir');
+            if (!confirm("Isso vai DELETAR todos os jogos de 16 Avos e recriar com os dados da API. Continuar?")) return;
+            el.innerText = '🔄 Buscando jogos da API...';
+            try {
+                const resp = await fetch('https://worldcup26.ir/get/games');
+                if (!resp.ok) throw new Error('Erro API ' + resp.status);
+                const data = await resp.json();
+                const r32 = data.games.filter(m => m.type === 'r32');
+
+                const { error: errDel } = await banco.from('jogos').delete().eq('grupo', '16 Avos');
+                if (errDel) throw errDel;
+
+                const { data: maxIdData } = await banco.from('jogos').select('id').order('id', { ascending: false }).limit(1);
+                let novoId = (maxIdData?.[0]?.id || 0) + 1;
+
+                let inseridos = 0;
+                for (const match of r32) {
+                    const timeCasa = match.home_team_name_en ? (en2pt[match.home_team_name_en] || match.home_team_name_en) : null;
+                    const timeFora = match.away_team_name_en ? (en2pt[match.away_team_name_en] || match.away_team_name_en) : null;
+                    const partes = match.local_date.split(' ');
+                    const dataApi = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
+                    const dataFormatada = getDataBrasilia(timeCasa, timeFora, dataApi, match);
+                    const { error } = await banco.from('jogos').insert({
+                        id: novoId++, grupo: '16 Avos', data: dataFormatada,
+                        time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null
+                    });
+                    if (!error) inseridos++;
+                }
+
+                el.innerText = `✅ ${inseridos} jogos de 16 Avos criados!`;
+                await carregarJogosEJogadores();
+            } catch (e) {
+                el.innerText = '❌ Erro: ' + e.message;
+            }
+        }
+
+        // --- Admin: ver palpites de todos ---
+        async function verTodosPalpites() {
+            const div = document.getElementById('lista-palpites-admin');
+            div.innerHTML = 'Carregando...';
+            const { data: perfis } = await banco.from('perfis').select('id, nome, pontos_bonus');
+            const { data: todosPalpites } = await banco.from('palpites').select('*');
+            if (!perfis || !todosPalpites) { div.innerHTML = 'Erro ao carregar.'; return; }
+
+            let html = '';
+            for (const perfil of perfis) {
+                const palpitesUser = todosPalpites.filter(p => p.usuario_id === perfil.id);
+                const palpitesComJogo = palpitesUser.filter(p => jogos.some(j => j.id === p.jogo_id));
+                if (palpitesComJogo.length === 0) continue;
+
+                let pontos = 0;
+                let detalhes = '';
+                palpitesComJogo.forEach(p => {
+                    const jogo = jogos.find(j => j.id === p.jogo_id);
+                    if (!jogo) return;
+                    const r1 = jogo.res1, r2 = jogo.res2;
+                    const temResultado = r1 !== null && r2 !== null;
+                    let acerto = 0;
+                    if (temResultado) {
+                        acerto = (p.palpite_time1 === r1 && p.palpite_time2 === r2) ? 5
+                            : ((p.palpite_time1 > p.palpite_time2 && r1 > r2) || (p.palpite_time1 < p.palpite_time2 && r1 < r2) || (p.palpite_time1 === p.palpite_time2 && r1 === r2)) ? 3 : 0;
+                        pontos += acerto;
+                    }
+                    const corLinha = temResultado ? '' : 'style="background:#fffde7;padding:4px 2px;border-radius:4px;"';
+                    const resultadoStr = temResultado ? `${jogo.res1}x${jogo.res2}` : '?x?';
+                    const ptsStr = temResultado ? `<span style="color:${acerto === 5 ? 'green' : acerto === 3 ? '#666' : 'red'};">(+${acerto})</span>` : '<span style="color:#aaa;">(⏳ futuro)</span>';
+                    detalhes += `<div style="font-size:0.75rem;padding:2px 0;border-bottom:1px solid #f0f0f0;" ${corLinha}>
+                        ${jogo.time1} ${resultadoStr} ${jogo.time2}
+                        → Palpite: ${p.palpite_time1}-${p.palpite_time2}
+                        ${ptsStr}
+                        <span style="color:#999;font-size:0.7rem;"> ${rotuloJogo(jogo)}</span>
+                    </div>`;
+                });
+                const bonus = perfil.pontos_bonus || 0;
+                const totalFinal = pontos + bonus;
+                const bonusStr = bonus > 0 ? ` <span style="color:#28a745;">(+${bonus} bônus)</span>` : '';
+                html += `<details style="margin-bottom:6px;font-size:0.85rem;">
+                    <summary style="cursor:pointer;font-weight:bold;padding:4px 0;"><strong>${perfil.nome}</strong> — ${totalFinal} pts${bonusStr}</summary>
+                    ${detalhes}
+                </details>`;
+            }
+            div.innerHTML = html || '<div style="color:#888;padding:10px;">Nenhum palpite em jogos com resultado.</div>';
+        }
+
+        // --- Limpar palpite individual ---
+        async function limparPalpite(jogoId) {
+            if (!confirm("Limpar este palpite?")) return;
+            const input1 = document.getElementById(`jogo_${jogoId}_p1`);
+            const input2 = document.getElementById(`jogo_${jogoId}_p2`);
+            if (input1) input1.value = '';
+            if (input2) input2.value = '';
+            await banco.from('palpites').delete().eq('usuario_id', usuarioAtual.id).eq('jogo_id', jogoId);
+            await carregarJogosEJogadores();
+        }
+
+        // --- Estatísticas do perfil ---
+        function calcularEstatisticas() {
+            let totalCravadas = 0, totalAcertos = 0, totalErros = 0, totalPontos = 0, totalJogos = 0;
+            jogos.forEach(jogo => {
+                if (jogo.res1 === null || jogo.res2 === null) return;
+                const palpite = palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id);
+                if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
+                totalJogos++;
+                const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                const r1 = jogo.res1, r2 = jogo.res2;
+                if (p1 === r1 && p2 === r2) { totalCravadas++; totalPontos += 5; }
+                else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { totalAcertos++; totalPontos += 3; }
+                else { totalErros++; }
+            });
+            if (usuarioAtual && usuarioAtual.pontos_bonus) totalPontos += usuarioAtual.pontos_bonus;
+            const aproveitamento = totalJogos > 0 ? ((totalPontos / (totalJogos * 5)) * 100).toFixed(1) : '0';
+            return { totalCravadas, totalAcertos, totalErros, totalPontos, totalJogos, aproveitamento };
+        }
+
+        function abrirPopupEstatisticas() {
+            const stats = calcularEstatisticas();
+            document.getElementById('stats-cravadas').innerText = stats.totalCravadas;
+            document.getElementById('stats-acertos').innerText = stats.totalAcertos;
+            document.getElementById('stats-erros').innerText = stats.totalErros;
+            document.getElementById('stats-pontos').innerText = stats.totalPontos;
+            document.getElementById('stats-jogos').innerText = stats.totalJogos;
+            document.getElementById('stats-aproveitamento').innerText = stats.aproveitamento + '%';
+            document.getElementById('popup-estatisticas').style.display = 'flex';
+        }
+        function fecharPopupEstatisticas() { document.getElementById('popup-estatisticas').style.display = 'none'; }
+
+        // --- Gráfico de evolução ---
+        function abrirPopupGrafico() {
+            document.getElementById('popup-grafico').style.display = 'flex';
+            setTimeout(renderizarGrafico, 200);
+        }
+        function fecharPopupGrafico() { document.getElementById('popup-grafico').style.display = 'none'; }
+
+        function renderizarGrafico() {
+            const canvas = document.getElementById('canvas-evolucao');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const w = Math.min(rect.width - 20, 460);
+            canvas.style.width = w + 'px';
+            canvas.style.height = '200px';
+            canvas.width = w * dpr;
+            canvas.height = 200 * dpr;
+            ctx.scale(dpr, dpr);
+
+            const dias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
+            dias.sort((a, b) => {
+                const [dA, mA] = a.split('/').map(Number);
+                const [dB, mB] = b.split('/').map(Number);
+                return mA - mB || dA - dB;
+            });
+
+            let cumulativo = 0;
+            const pontosPorDia = [];
+            for (const dia of dias) {
+                const jogosDoDia = jogos.filter(j => j.data.startsWith(dia));
+                let pontosDia = 0;
+                jogosDoDia.forEach(jogo => {
+                    if (jogo.res1 === null || jogo.res2 === null) return;
+                    const palpite = palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id);
+                    if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
+                    const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                    const r1 = jogo.res1, r2 = jogo.res2;
+                    if (p1 === r1 && p2 === r2) pontosDia += 5;
+                    else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontosDia += 3;
+                });
+                cumulativo += pontosDia;
+                pontosPorDia.push({ dia, pontosDia, cumulativo });
+            }
+
+            if (pontosPorDia.length === 0) {
+                ctx.font = '14px sans-serif';
+                ctx.fillStyle = '#888';
+                ctx.textAlign = 'center';
+                ctx.fillText('Nenhum resultado ainda', w/2, 100);
+                return;
+            }
+
+            const pad = { top: 20, right: 10, bottom: 30, left: 40 };
+            const cw = w - pad.left - pad.right;
+            const ch = 200 - pad.top - pad.bottom;
+            const maxPts = Math.max(...pontosPorDia.map(p => p.cumulativo), 5);
+
+            // Grid
+            ctx.strokeStyle = '#eee';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = pad.top + (ch / 4) * i;
+                ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+                ctx.fillStyle = '#999';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(maxPts - (maxPts / 4) * i), pad.left - 5, y + 3);
+            }
+
+            // Linha
+            ctx.beginPath();
+            ctx.strokeStyle = '#038C3E';
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            pontosPorDia.forEach((p, i) => {
+                const x = pad.left + (cw / (pontosPorDia.length - 1 || 1)) * i;
+                const y = pad.top + ch - (p.cumulativo / maxPts) * ch;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Pontos
+            ctx.fillStyle = '#038C3E';
+            pontosPorDia.forEach((p, i) => {
+                const x = pad.left + (cw / (pontosPorDia.length - 1 || 1)) * i;
+                const y = pad.top + ch - (p.cumulativo / maxPts) * ch;
+                ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+            });
+
+            // Labels
+            ctx.fillStyle = '#666';
+            ctx.font = '9px sans-serif';
+            ctx.textAlign = 'center';
+            pontosPorDia.forEach((p, i) => {
+                const x = pad.left + (cw / (pontosPorDia.length - 1 || 1)) * i;
+                ctx.fillText(p.dia, x, 200 - 8);
+            });
+
+            // Preenchimento gradiente
+            const grad = ctx.createLinearGradient(0, pad.top, 0, 200 - pad.bottom);
+            grad.addColorStop(0, 'rgba(3,140,62,0.2)');
+            grad.addColorStop(1, 'rgba(3,140,62,0.01)');
+            ctx.beginPath();
+            pontosPorDia.forEach((p, i) => {
+                const x = pad.left + (cw / (pontosPorDia.length - 1 || 1)) * i;
+                const y = pad.top + ch - (p.cumulativo / maxPts) * ch;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            const lastX = pad.left + cw;
+            ctx.lineTo(lastX, pad.top + ch);
+            ctx.lineTo(pad.left, pad.top + ch);
+            ctx.closePath();
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+
+        // --- Aba de grupos ---
+        let abaAtiva = 'dia';
+
+        function alternarAbaGrupo(grupo) {
+            abaAtiva = 'grupo';
+            document.querySelectorAll('#dias-tabs .tab-btn').forEach(b => b.classList.remove('ativo'));
+            document.querySelectorAll('.grupo-btn').forEach(b => b.classList.remove('ativo'));
+            const btnGrupo = document.getElementById(`grupo-btn-${grupo}`);
+            if (btnGrupo) btnGrupo.classList.add('ativo');
+            document.getElementById('container-jogos').style.display = '';
+            document.getElementById('container-fase').style.display = 'none';
+            document.querySelectorAll('.jogo-dia').forEach(card => {
+                card.style.display = card.getAttribute('data-grupo') === grupo ? 'flex' : 'none';
+            });
+        }
+
+        function voltarAbaDia() {
+            abaAtiva = 'dia';
+            document.querySelectorAll('.grupo-btn').forEach(b => b.classList.remove('ativo'));
+            const diaAtivo = document.querySelector('.tab-btn.ativo');
+            if (diaAtivo) diaAtivo.click();
+            else {
+                const primeiro = document.querySelector('.tab-btn');
+                if (primeiro) primeiro.click();
+            }
+        }
+
+        let palpitesUsuarioAlvo = [];
+        let nomeUsuarioAlvo = '';
+
+        async function verAcertosDe(usuarioId, nome) {
+            nomeUsuarioAlvo = nome;
+            const { data } = await banco.from('palpites').select('*').eq('usuario_id', usuarioId);
+            palpitesUsuarioAlvo = data || [];
+            document.getElementById('popup-usuario').style.display = 'flex';
+            document.getElementById('titulo-popup-usuario').innerText = `👤 ${nome}`;
+            mudarAbaUsuario('cravada');
+        }
+
+        function fecharPopupUsuario() {
+            document.getElementById('popup-usuario').style.display = 'none';
+        }
+
+        function mudarAbaUsuario(tipo) {
+            document.querySelectorAll('#popup-usuario .t-tab-btn').forEach(b => b.classList.remove('ativo'));
+            document.getElementById('utab-' + tipo).classList.add('ativo');
+
+            const div = document.getElementById('lista-usuario');
+            div.innerHTML = '';
+            let total = 0;
+
+            const jogosOrdenados = [...jogos].sort((a, b) => getDataJogo(b.data).getTime() - getDataJogo(a.data).getTime());
+            jogosOrdenados.forEach(jogo => {
+                if (jogo.res1 === null || jogo.res2 === null) return;
+                const palpite = palpitesUsuarioAlvo.find(p => p.jogo_id === jogo.id);
+                if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
+
+                const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
+                const r1 = jogo.res1, r2 = jogo.res2;
+                let categoria = 'errou';
+                if (p1 === r1 && p2 === r2) categoria = 'cravada';
+                else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) categoria = 'acertou';
+
+                if (categoria !== tipo) return;
+                total++;
+
+                div.innerHTML += `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;gap:8px;">
+                        <div style="flex:1;min-width:0;">
+                            <strong>${jogo.time1}</strong> vs <strong>${jogo.time2}</strong>
+                            <div style="font-size:0.75rem;color:#888;">${rotuloJogo(jogo)}</div>
+                        </div>
+                        <div style="text-align:right;white-space:nowrap;">
+                            Palpite: ${p1}-${p2}<br>
+                            <span style="color:#666;">Real: ${r1}-${r2}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (total === 0) {
+                div.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">Nenhum resultado nessa categoria.</div>';
+            }
+        }
+    </script>
+
+    <div class="popup-notificacao" id="popup-filtros">
+        <div class="popup-conteudo" style="max-width: 500px;">
+            <button onclick="fecharPopupFiltros()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">📊 Meus Resultados</h3>
+            <div class="tutorial-tabs">
+                <button class="t-tab-btn ativo" id="filtro-tab-cravada" onclick="mudarAbaFiltro('cravada')">🎯 Cravadas</button>
+                <button class="t-tab-btn" id="filtro-tab-acertou" onclick="mudarAbaFiltro('acertou')">✅ Acertou</button>
+                <button class="t-tab-btn" id="filtro-tab-errou" onclick="mudarAbaFiltro('errou')">❌ Errou</button>
+            </div>
+            <div id="lista-filtros" style="text-align:left;max-height:350px;overflow-y:auto;padding-right:5px;font-size:0.85rem;"></div>
+            <button class="btn-acao" style="margin-top:15px;background:#666;" onclick="fecharPopupFiltros()">Fechar</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-usuario">
+        <div class="popup-conteudo" style="max-width: 500px;">
+            <button onclick="fecharPopupUsuario()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo" id="titulo-popup-usuario">👤 Resultados</h3>
+            <div class="tutorial-tabs">
+                <button class="t-tab-btn ativo" id="utab-cravada" onclick="mudarAbaUsuario('cravada')">🎯 Cravadas</button>
+                <button class="t-tab-btn" id="utab-acertou" onclick="mudarAbaUsuario('acertou')">✅ Acertou</button>
+                <button class="t-tab-btn" id="utab-errou" onclick="mudarAbaUsuario('errou')">❌ Errou</button>
+            </div>
+            <div id="lista-usuario" style="text-align:left;max-height:350px;overflow-y:auto;padding-right:5px;font-size:0.85rem;"></div>
+            <button class="btn-acao" style="margin-top:15px;background:#666;" onclick="fecharPopupUsuario()">Fechar</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-estatisticas">
+        <div class="popup-conteudo" style="max-width: 400px;">
+            <button onclick="fecharPopupEstatisticas()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">📊 Minhas Estatísticas</h3>
+            <div class="stat-grid">
+                <div class="stat-item"><div class="stat-valor" id="stats-pontos">0</div><div class="stat-label">Total Pontos</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-aproveitamento">0%</div><div class="stat-label">Aproveitamento</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-jogos">0</div><div class="stat-label">Jogos com resultado</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-cravadas">0</div><div class="stat-label">🎯 Cravadas (5pts)</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-acertos">0</div><div class="stat-label">✅ Acertos (3pts)</div></div>
+                <div class="stat-item"><div class="stat-valor" id="stats-erros">0</div><div class="stat-label">❌ Erros (0pts)</div></div>
+            </div>
+            <button class="btn-acao" style="margin-top:15px;background:#666;" onclick="fecharPopupEstatisticas()">Fechar</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-grafico">
+        <div class="popup-conteudo" style="max-width: 500px;">
+            <button onclick="fecharPopupGrafico()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">📈 Evolução dos Pontos</h3>
+            <p style="font-size:0.8rem;color:#888;margin:-5px 0 10px;">Pontos acumulados por dia de jogo</p>
+            <div class="chart-container"><canvas id="canvas-evolucao"></canvas></div>
+            <button class="btn-acao" style="margin-top:10px;background:#666;" onclick="fecharPopupGrafico()">Fechar</button>
+        </div>
+    </div>
+
+            <div class="popup-notificacao" id="popup-admin" style="display: none;">
+        <div class="popup-conteudo" style="max-width: 500px;">
+            <button onclick="fecharAdmin()" style="position:sticky;top:0;float:right;z-index:2;background:white;border:none;font-size:1.2rem;cursor:pointer;color:#888;border-radius:50%;padding:4px 8px;">✖</button>
+            <h3 class="popup-titulo">⚙️ Painel de Adm</h3>
+
+            <details style="margin-bottom:15px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">➕ Novo Jogo</summary>
+                <select id="adm-novo-grupo" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;font-size:0.85rem;margin-top:8px;">
+                    <option value="">Selecione...</option>
+                    <optgroup label="Fase de Grupos">
+                        <option>Grupo A</option><option>Grupo B</option><option>Grupo C</option><option>Grupo D</option>
+                        <option>Grupo E</option><option>Grupo F</option><option>Grupo G</option><option>Grupo H</option>
+                        <option>Grupo I</option><option>Grupo J</option><option>Grupo K</option><option>Grupo L</option>
+                    </optgroup>
+                    <optgroup label="Mata-Mata">
+                        <option>16 Avos</option>
+                        <option>Oitavas</option>
+                        <option>Quartas</option>
+                        <option>Semifinais</option>
+                        <option>Disputa de 3º Lugar</option>
+                        <option>Final</option>
+                    </optgroup>
+                </select>
+                <input type="text" id="adm-novo-data" placeholder="Data (ex: 28/06 - 16:00)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;font-size:0.85rem;box-sizing:border-box;">
+                <div style="display:flex;gap:6px;">
+                    <input type="text" id="adm-novo-time1" placeholder="Time 1" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;">
+                    <input type="text" id="adm-novo-time2" placeholder="Time 2" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;">
+                </div>
+                <button onclick="adicionarJogoAdmin()" style="width:100%;padding:8px;margin-top:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">Adicionar Jogo</button>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">🔄 Sincronizar resultados</summary>
+                <div style="margin-top:8px;">
+                <button onclick="sincronizarAPI()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📡 Sincronizar resultados</button>
+                <div id="status-sync" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">🏆 Importar Mata-Mata</summary>
+                <div style="margin-top:8px;">
+                <button onclick="importarMataMata()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📥 Importar jogos da API</button>
+                <div id="status-import" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">⚽ Artilheiros</summary>
+                <div style="margin-top:8px;">
+                <button onclick="adicionarColunasArtilheiros()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">➕ Adicionar colunas de artilheiros</button>
+                <div id="status-artilheiros" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">🔧 Corrigir 16 Avos</summary>
+                <div style="margin-top:8px;">
+                <button onclick="corrigir16Avos()" style="width:100%;padding:8px;background:#d93025;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">🗑️ Deletar e recriar 16 Avos com dados corretos</button>
+                <div id="status-corrigir" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">👁️ Dias Visíveis</summary>
+                <div style="margin-top:8px;">
+                <button onclick="abrirPopupDias()" style="width:100%;padding:8px;background:var(--secondary);color:var(--text);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">🗓️ Selecionar dias visíveis</button>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">🔔 Notificar todos</summary>
+                <div style="margin-top:8px;">
+                <button onclick="notificarTodos()" style="width:100%;padding:8px;background:var(--secondary);color:var(--text);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">🔔 Notificar todos sobre resultados</button>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">📋 Adicionar Palpite (Admin)</summary>
+                <div style="margin-top:8px;">
+                <button onclick="carregarParaAdicionarPalpite()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📋 Carregar dados</button>
+                <div id="area-adicionar-palpite" style="margin-top:8px;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">✏️ Editar Pontos</summary>
+                <div style="margin-top:8px;">
+                <button onclick="abrirEdicaoPontos()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📋 Carregar usuários</button>
+                <div id="lista-usuarios-pontos" style="margin-top:8px;max-height:300px;overflow-y:auto;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">⚖️ Ajuste de Pontuação (Liga)</summary>
+                <div style="margin-top:8px;">
+                <button onclick="criarTabelaAjustes()" style="width:100%;padding:6px;background:var(--secondary);color:var(--text);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.8rem;margin-bottom:6px;">➕ Criar tabela de ajustes</button>
+                <div id="status-ajustes" style="font-size:0.75rem;color:#888;text-align:center;margin-bottom:6px;"></div>
+                <button onclick="carregarLigasParaAjuste()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">📋 Carregar ligas</button>
+                <div id="lista-ajustes" style="margin-top:8px;max-height:300px;overflow-y:auto;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">🏆 Ligas</summary>
+                <div style="margin-top:8px;">
+                <button onclick="criarTabelasLigas()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">➕ Criar tabelas de ligas</button>
+                <div id="status-ligas" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
+                </div>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">⚙️ Renomear time</summary>
+                <div style="display:flex;gap:6px;margin-top:8px;margin-bottom:6px;">
+                    <input type="text" id="adm-rename-old" placeholder="Nome atual" value="Países Baixos" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                    <input type="text" id="adm-rename-new" placeholder="Novo nome" value="Holanda" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                </div>
+                <button onclick="renameTimeNoBanco()" style="width:100%;padding:6px;background:var(--primary);color:white;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;">Renomear</button>
+            </details>
+
+            <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
+                <summary style="cursor:pointer;color:#888;font-weight:bold;">👁️ Ver palpites de todos</summary>
+                <div id="lista-palpites-admin" style="margin-top:8px;max-height:300px;overflow-y:auto;font-size:0.85rem;"></div>
+                <button onclick="verTodosPalpites()" style="width:100%;padding:6px;margin-top:6px;background:var(--primary);color:white;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;">Carregar</button>
+            </details>
+
+            <div style="font-size:0.8rem;color:#666;margin-bottom:6px;text-align:left;">Editar resultados:</div>
+            <select id="filtro-dia-admin" onchange="renderizarListaJogosAdmin()" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;margin-bottom:8px;"></select>
+            <div id="lista-jogos-admin" style="text-align: left; max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
+            <button class="btn-acao" style="margin-top: 15px; background: #666;" onclick="fecharAdmin()">Fechar</button>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-ajuste" style="display:none;">
+        <div class="popup-conteudo" style="max-width: 450px;">
+            <button onclick="fecharPopupAjuste()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">⚖️ Ajustar Pontuação</h3>
+            <div id="conteudo-ajuste" style="text-align:left;"></div>
+        </div>
+    </div>
+
+    <div class="popup-notificacao" id="popup-dias">
+        <div class="popup-conteudo" style="max-width: 400px;">
+            <button onclick="fecharPopupDias()" style="position:absolute;top:12px;right:15px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✖</button>
+            <h3 class="popup-titulo">🗓️ Dias Visíveis</h3>
+            <p style="font-size:0.8rem;color:#888;margin:-5px 0 15px;">Marque os dias que deseja mostrar nas abas:</p>
+            <div id="lista-dias-popup" style="max-height:350px;overflow-y:auto;"></div>
+            <div style="display:flex;gap:8px;margin-top:15px;">
+                <button onclick="salvarDiasVisiveis()" class="btn-acao" style="flex:1;">Salvar</button>
+                <button onclick="fecharPopupDias()" class="btn-acao" style="flex:1;background:#666;">Fechar</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
