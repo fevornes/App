@@ -1128,7 +1128,7 @@
                 const container = document.getElementById('container-jogos');
                 container.innerHTML = '';
 
-                const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
+                const diasUnicos = [...new Set(jogos.filter(j => j.grupo?.startsWith('Grupo')).map(jogo => jogo.data.split(' - ')[0]))];
                 const hoje = new Date();
                 const hojeDDMM = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`;
                 const ehMataMataHoje = hoje >= new Date(2026, 5, 28);
@@ -1164,12 +1164,15 @@
                     document.getElementById('container-fase').style.display = 'none';
                 }
 
-                // Criar abas de dia (fase de grupos) - filtradas pela config do admin no banco
+                // Criar abas de dia - prioriza config do admin no banco, depois localStorage
                 let diasVisiveis = null;
                 try {
                     const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
                     if (data?.valor) diasVisiveis = JSON.parse(data.valor);
-                } catch (e) {}
+                } catch (e) {
+                    const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+                    if (local) diasVisiveis = local;
+                }
                 const diasParaMostrar = diasVisiveis || diasUnicos;
                 diasUnicos.filter(d => diasParaMostrar.includes(d)).forEach(dia => {
                         const btn = document.createElement('button');
@@ -2336,7 +2339,7 @@
             const container = document.getElementById('lista-dias-popup');
             container.innerHTML = 'Carregando...';
             document.getElementById('popup-dias').style.display = 'flex';
-            const todosDias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
+            const todosDias = [...new Set(jogos.filter(j => j.grupo?.startsWith('Grupo')).map(j => j.data.split(' - ')[0]))];
             todosDias.sort((a, b) => {
                 const [dA, mA] = a.split('/').map(Number);
                 const [dB, mB] = b.split('/').map(Number);
@@ -2346,7 +2349,10 @@
             try {
                 const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
                 if (data?.valor) visiveis = JSON.parse(data.valor);
-            } catch (e) {}
+            } catch (e) {
+                const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
+                if (local) visiveis = local;
+            }
             container.innerHTML = '';
             todosDias.forEach(dia => {
                 const checked = visiveis.includes(dia) ? 'checked' : '';
