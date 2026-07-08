@@ -1128,7 +1128,7 @@
                 const container = document.getElementById('container-jogos');
                 container.innerHTML = '';
 
-                const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
+                const diasUnicos = [...new Set(jogos.filter(j => j.grupo?.startsWith('Grupo')).map(jogo => jogo.data.split(' - ')[0]))];
                 const hoje = new Date();
                 const hojeDDMM = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`;
                 const ehMataMataHoje = hoje >= new Date(2026, 5, 28);
@@ -2339,7 +2339,7 @@
             const container = document.getElementById('lista-dias-popup');
             container.innerHTML = 'Carregando...';
             document.getElementById('popup-dias').style.display = 'flex';
-            const todosDias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
+            const todosDias = [...new Set(jogos.filter(j => j.grupo?.startsWith('Grupo')).map(j => j.data.split(' - ')[0]))];
             todosDias.sort((a, b) => {
                 const [dA, mA] = a.split('/').map(Number);
                 const [dB, mB] = b.split('/').map(Number);
