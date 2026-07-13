@@ -1131,6 +1131,7 @@
                         }
                         j.res1 = null; j.res2 = null;
                         if (j.home_scorers !== undefined) { j.home_scorers = null; j.away_scorers = null; }
+                        if (j.home_pen !== undefined) { j.home_pen = null; j.away_pen = null; }
                     }
                 }
 
@@ -1163,10 +1164,10 @@
                 const tabsContainer = document.getElementById('dias-tabs');
                 tabsContainer.innerHTML = '';
 
-                const fasesMataMata = [...new Set(jogos.filter(j => !j.grupo.startsWith('Grupo')).map(j => j.grupo))];
+                const fasesMataMataJogos = [...new Set(jogos.filter(j => !j.grupo.startsWith('Grupo')).map(j => j.grupo))];
                 const fasesOrdem = ['16 Avos', 'Oitavas', 'Quartas', 'Semifinais', 'Disputa de 3º Lugar', 'Final'];
-                fasesMataMata.sort((a, b) => fasesOrdem.indexOf(a) - fasesOrdem.indexOf(b));
-                const ehMataMata = fasesMataMata.length > 0;
+                fasesMataMataJogos.sort((a, b) => fasesOrdem.indexOf(a) - fasesOrdem.indexOf(b));
+                const temMataMata = fasesMataMataJogos.length > 0;
 
                 function limparAbas() {
                     document.querySelectorAll('#dias-tabs .tab-btn').forEach(b => b.classList.remove('ativo'));
@@ -1205,8 +1206,8 @@
                     });
 
                 // Se existir mata-mata, adicionar abas de fase ao final
-                if (ehMataMata) {
-                    fasesMataMata.forEach(fase => {
+                if (temMataMata) {
+                    fasesMataMataJogos.forEach(fase => {
                         const btn = document.createElement('button');
                         btn.className = 'tab-btn';
                         btn.innerText = fase;
@@ -2137,7 +2138,7 @@ ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
             const token = sess.data.session?.access_token;
             if (!token) return alert("Sessão expirada. Refaça o login.");
 
-            const updateData = { time1: t1, time2: t2, res1: r1 !== '' ? parseInt(r1) : null, res2: r2 !== '' ? parseInt(r2) : null, manual_edit: true };
+            const updateData = { time1: t1, time2: t2, res1: r1 !== '' ? parseInt(r1) : null, res2: r2 !== '' ? parseInt(r2) : null, manual_edit: true, home_pen: null, away_pen: null, home_scorers: null, away_scorers: null };
             const resp = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
