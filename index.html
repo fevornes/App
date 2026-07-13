@@ -811,16 +811,20 @@
                         return true;
                     });
                     if (!jogoBD) { console.log('[AutoSync] Jogo não encontrado no BD:', timeCasa, 'x', timeFora); continue; }
+                    if (jogoBD.manual_edit) { continue; }
                     if (match.finished === 'TRUE') jogosFinalizados.add(jogoBD.id);
                     const res1 = jogoBD.time1 === timeCasa ? gc : gf;
                     const res2 = jogoBD.time1 === timeCasa ? gf : gc;
-                    if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+                    const hp = match.home_penalty_score != null ? parseInt(match.home_penalty_score) : null;
+                    const ap = match.away_penalty_score != null ? parseInt(match.away_penalty_score) : null;
+                    if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2 || jogoBD.home_pen !== hp || jogoBD.away_pen !== ap) {
                         const updateData = { res1, res2 };
                         try {
                             const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
                             const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
                             if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
                         } catch (e) {}
+                        if (!isNaN(hp) && !isNaN(ap)) { updateData.home_pen = hp; updateData.away_pen = ap; }
                         try {
                             await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
                         } catch (e) {
@@ -829,16 +833,15 @@
                         }
                         atualizados++;
                     } else {
-                        // Sync scorers even if score unchanged
                         try {
                             const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
                             const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
                             const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
                             const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
-                            if ((hs || null) !== hsBD || (as || null) !== asBD) {
-                                try {
-                                    await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id);
-                                } catch (e) {}
+                            if ((hs || null) !== hsBD || (as || null) !== asBD || jogoBD.home_pen !== hp || jogoBD.away_pen !== ap) {
+                                const upd = { home_scorers: hs, away_scorers: as };
+                                if (!isNaN(hp) && !isNaN(ap)) { upd.home_pen = hp; upd.away_pen = ap; }
+                                try { await banco.from('jogos').update(upd).eq('id', jogoBD.id); } catch (e) {}
                             }
                         } catch (e) {}
                     }
@@ -851,6 +854,19 @@
         }
 
         const tipoParaFase = { r32: '16 Avos', r16: 'Oitavas', qf: 'Quartas', sf: 'Semifinais', third: 'Disputa de 3º Lugar', final: 'Final' };
+        const fasesMataMata = Object.values(tipoParaFase);
+        function ehMataMata(grupo) { return fasesMataMata.includes(grupo); }
+        function getRes(jogo) {
+            if (!ehMataMata(jogo.grupo) || jogo.res1 === null || jogo.res2 === null) return { r1: jogo.res1, r2: jogo.res2 };
+            const hp = parseInt(jogo.home_pen);
+            const ap = parseInt(jogo.away_pen);
+            const gc = parseInt(jogo.res1);
+            const gf = parseInt(jogo.res2);
+            if (!isNaN(hp) && !isNaN(ap) && hp >= 0 && ap >= 0) {
+                return { r1: gc - hp, r2: gf - ap, pen: true };
+            }
+            return { r1: gc, r2: gf, pen: false };
+        }
         const horariosBrasilia = (function(){
             const h = {};
             const add = (t1, t2, data) => { h[t1+'|'+t2] = data; h[t2+'|'+t1] = data; };
@@ -870,18 +886,6 @@
             add('Austrália','Egito','03/07 - 15:00');
             add('Argentina','Cabo Verde','03/07 - 19:00');
             add('Colômbia','Gana','03/07 - 22:30');
-            add('Canadá','Marrocos','04/07 - 14:00');
-            add('Paraguai','França','04/07 - 18:00');
-            add('Brasil','Noruega','05/07 - 17:00');
-            add('México','Inglaterra','05/07 - 21:00');
-            add('Portugal','Espanha','06/07 - 16:00');
-            add('Estados Unidos','Bélgica','06/07 - 21:00');
-            add('Argentina','Egito','07/07 - 13:00');
-            add('Suíça','Colômbia','07/07 - 17:00');
-            add('França','Marrocos','09/07 - 17:00');
-            add('Espanha','Bélgica','10/07 - 16:00');
-            add('Noruega','Inglaterra','11/07 - 18:00');
-            add('Argentina','Suíça','11/07 - 22:00');
             return h;
         })();
 
@@ -1041,6 +1045,9 @@
                             const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
                             const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
                             if (hs || as) { insertData.home_scorers = hs; insertData.away_scorers = as; }
+                            const hp = match.home_penalty_score != null ? parseInt(match.home_penalty_score) : null;
+                            const ap = match.away_penalty_score != null ? parseInt(match.away_penalty_score) : null;
+                            if (!isNaN(hp) && !isNaN(ap)) { insertData.home_pen = hp; insertData.away_pen = ap; }
                         } catch (e) {}
                         const { error: errIns } = await banco.from('jogos').insert(insertData);
                         if (errIns) { console.error('[ImportMM] Erro insert:', errIns); continue; }
@@ -1065,18 +1072,22 @@
         }
 
         async function atualizarResultadoSePrecisar(jogoBD, match, timeCasa, timeFora) {
+            if (jogoBD.manual_edit) return;
             const gc = parseInt(match.home_score);
             const gf = parseInt(match.away_score);
             if (isNaN(gc) || isNaN(gf)) return;
             const res1 = jogoBD.time1 === timeCasa ? gc : gf;
             const res2 = jogoBD.time1 === timeCasa ? gf : gc;
-            if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+            const hp = match.home_penalty_score != null ? parseInt(match.home_penalty_score) : null;
+            const ap = match.away_penalty_score != null ? parseInt(match.away_penalty_score) : null;
+            if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2 || jogoBD.home_pen !== hp || jogoBD.away_pen !== ap) {
                 const updateData = { res1, res2 };
                 try {
                     const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
                     const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
                     if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
                 } catch (e) {}
+                if (!isNaN(hp) && !isNaN(ap)) { updateData.home_pen = hp; updateData.away_pen = ap; }
                 try {
                     await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
                 } catch (e) {
@@ -1089,8 +1100,10 @@
                     const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
                     const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
                     const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
-                    if ((hs || null) !== hsBD || (as || null) !== asBD) {
-                        try { await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id); } catch (e) {}
+                    if ((hs || null) !== hsBD || (as || null) !== asBD || jogoBD.home_pen !== hp || jogoBD.away_pen !== ap) {
+                        const upd = { home_scorers: hs, away_scorers: as };
+                        if (!isNaN(hp) && !isNaN(ap)) { upd.home_pen = hp; upd.away_pen = ap; }
+                        try { await banco.from('jogos').update(upd).eq('id', jogoBD.id); } catch (e) {}
                     }
                 } catch (e) {}
             }
@@ -1111,7 +1124,7 @@
                 for (const j of jogos) {
                     if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
                         try {
-                            await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null }).eq('id', j.id);
+                                await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null, home_pen: null, away_pen: null }).eq('id', j.id);
                         } catch (e) {
                             await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
                         }
@@ -1128,7 +1141,7 @@
                 const container = document.getElementById('container-jogos');
                 container.innerHTML = '';
 
-                const diasUnicos = [...new Set(jogos.filter(j => j.grupo?.startsWith('Grupo')).map(jogo => jogo.data.split(' - ')[0]))];
+                const diasUnicos = [...new Set(jogos.map(jogo => jogo.data.split(' - ')[0]))];
                 const hoje = new Date();
                 const hojeDDMM = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`;
                 const ehMataMataHoje = hoje >= new Date(2026, 5, 28);
@@ -1164,11 +1177,12 @@
                     document.getElementById('container-fase').style.display = 'none';
                 }
 
-                // Criar abas de dia - prioriza config do admin no banco, depois localStorage
+                // Criar abas de dia (fase de grupos) - filtradas pelas configuracoes
                 let diasVisiveis = null;
                 try {
                     const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
                     if (data?.valor) diasVisiveis = JSON.parse(data.valor);
+                    else { const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null'); if (local) diasVisiveis = local; }
                 } catch (e) {
                     const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
                     if (local) diasVisiveis = local;
@@ -1212,15 +1226,16 @@
                                 const encerrado = jogoJaComecou(j.data);
                                 const disabledAttr = encerrado ? 'disabled' : '';
                                 const temResultado = j.res1 !== null && j.res2 !== null;
+                                const resJ = temResultado ? getRes(j) : { r1: null, r2: null };
                                 let classeCard = '';
-                                if (temResultado && p1Value !== '' && p2Value !== '') {
+                                if (temResultado && p1Value !== '' && p2Value !== '' && resJ.r1 !== null && resJ.r2 !== null) {
                                     const p1 = parseInt(p1Value), p2 = parseInt(p2Value);
-                                    if (p1 === j.res1 && p2 === j.res2) classeCard = 'acerto-exato';
-                                    else if ((p1 > p2 && j.res1 > j.res2) || (p1 < p2 && j.res1 < j.res2) || (p1 === p2 && j.res1 === j.res2)) classeCard = 'acerto-vencedor';
+                                    if (p1 === resJ.r1 && p2 === resJ.r2) classeCard = 'acerto-exato';
+                                    else if ((p1 > p2 && resJ.r1 > resJ.r2) || (p1 < p2 && resJ.r1 < resJ.r2) || (p1 === p2 && resJ.r1 === resJ.r2)) classeCard = 'acerto-vencedor';
                                     else classeCard = 'erro-total';
                                 }
                                 let infoLinha = `${ehMataMataHoje ? '* ' : ''}${fase} • ${j.data}`;
-                                if (temResultado) infoLinha += ` | (Real: ${j.time1} ${j.res1} x ${j.res2} ${j.time2})`;
+                                if (temResultado) infoLinha += ` | (Real: ${j.time1} ${resJ.r1} x ${resJ.r2} ${j.time2})`;
                                 const temPalpiteFase = p1Value !== '' && p2Value !== '';
                                 const ehFinalizadoFase = (jogosFinalizadosInicializado && jogosFinalizados.has(j.id)) || jogoFinalizadoPorTempo(j.data);
                                 const ehAoVivoFase = temResultado && encerrado && !ehFinalizadoFase;
@@ -1257,7 +1272,6 @@
                                 if (p1 && p2) {
                                     valoresOriginais[`${j.id}_p1`] = p1.value;
                                     valoresOriginais[`${j.id}_p2`] = p2.value;
-                                    p1.oninput = p2.oninput = atualizarEstadoBotao;
                                 }
                             });
                             atualizarEstadoBotao();
@@ -1290,10 +1304,12 @@
                     btn.onclick = () => alternarAbaGrupo(grupo);
                     gruposContainer.appendChild(btn);
                 });
-                // Ativar aba: Quartas como padrão
-                const tabQuartas = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === 'Quartas');
-                if (tabQuartas) tabQuartas.click();
-                else {
+                // Ativar aba: 16 Avos a partir de 28/06, senão primeiro dia
+                if (hoje >= new Date(2026, 5, 28)) {
+                    const tab16 = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === '16 Avos');
+                    if (tab16) tab16.click();
+                    else { const p = document.querySelector('#dias-tabs .tab-btn'); if (p) p.click(); }
+                } else {
                     const p = document.querySelector('#dias-tabs .tab-btn');
                     if (p) p.click();
                 }
@@ -1308,14 +1324,14 @@
                     let classeResultado = '';
 
                     if (jogo.res1 !== null && jogo.res2 !== null) {
-                        statusJogo += ` | (Real: ${jogo.time1} ${jogo.res1} x ${jogo.res2} ${jogo.time2})`;
+                        const rDisp = getRes(jogo);
+                        statusJogo += ` | (Real: ${jogo.time1} ${rDisp.r1} x ${rDisp.r2} ${jogo.time2})`;
                         
-                        if (palpite !== undefined && palpite !== null && p1Value !== '' && p2Value !== '') {
+                        if (palpite !== undefined && palpite !== null && p1Value !== '' && p2Value !== '' && rDisp.r1 !== null && rDisp.r2 !== null) {
                             const p1 = parseInt(p1Value), p2 = parseInt(p2Value);
-                            const r1 = jogo.res1, r2 = jogo.res2;
 
-                            if (p1 === r1 && p2 === r2) { classeResultado = 'acerto-exato'; } 
-                            else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { classeResultado = 'acerto-vencedor'; } 
+                            if (p1 === rDisp.r1 && p2 === rDisp.r2) { classeResultado = 'acerto-exato'; } 
+                            else if ((p1 > p2 && rDisp.r1 > rDisp.r2) || (p1 < p2 && rDisp.r1 < rDisp.r2) || (p1 === p2 && rDisp.r1 === rDisp.r2)) { classeResultado = 'acerto-vencedor'; } 
                             else { classeResultado = 'erro-total'; }
                         } else { classeResultado = 'erro-total'; }
                     }
@@ -1468,7 +1484,9 @@
                         if (!palpite) return;
 
                         const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                        const r1 = jogo.res1, r2 = jogo.res2;
+                        const res = getRes(jogo);
+                        const r1 = res.r1, r2 = res.r2;
+                        if (r1 === null || r2 === null) return;
 
                         if (p1 === r1 && p2 === r2) { pontosDoUsuario += 5; } 
                         else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { pontosDoUsuario += 3; }
@@ -1569,7 +1587,9 @@
                     const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
                     if (!palpite) return;
                     const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                    const r1 = jogo.res1, r2 = jogo.res2;
+                    const res = getRes(jogo);
+                    const r1 = res.r1, r2 = res.r2;
+                    if (r1 === null || r2 === null) return;
                     if (p1 === r1 && p2 === r2) pontosDoUsuario += 5;
                     else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontosDoUsuario += 3;
                 });
@@ -1760,7 +1780,9 @@
                 const palpite = todosPalpites?.find(p => p.jogo_id === jogo.id);
                 if (!palpite) return;
                 const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                const r1 = jogo.res1, r2 = jogo.res2;
+                const res = getRes(jogo);
+                const r1 = res.r1, r2 = res.r2;
+                if (r1 === null || r2 === null) return;
                 if (p1 === r1 && p2 === r2) pontos += 5;
                 else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontos += 3;
             });
@@ -1878,7 +1900,9 @@
                 if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
 
                 const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                const r1 = jogo.res1, r2 = jogo.res2;
+                const res = getRes(jogo);
+                const r1 = res.r1, r2 = res.r2;
+                if (r1 === null || r2 === null) return;
                 let categoria = 'errou';
                 if (p1 === r1 && p2 === r2) categoria = 'cravada';
                 else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) categoria = 'acertou';
@@ -1970,11 +1994,49 @@
             try {
                 const { data: teste } = await banco.from('jogos').select('home_scorers').limit(1);
                 if (teste && teste[0] && teste[0].hasOwnProperty('home_scorers')) {
-                    el.innerText = '✅ Colunas já existem!';
+                    el.innerText = '✅ Colunas de artilheiros já existem!';
+                } else {
+                    const sql = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_scorers TEXT, ADD COLUMN IF NOT EXISTS away_scorers TEXT;`;
+                    try {
+                        const sess = await banco.auth.getSession();
+                        const token = sess.data.session?.access_token;
+                        if (token) {
+                            const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                                body: JSON.stringify({ query: sql })
+                            });
+                        }
+                    } catch (e) {}
+                }
+            } catch (e) {}
+            try {
+                const { data: teste2 } = await banco.from('jogos').select('home_pen').limit(1);
+                if (teste2 && teste2[0] && teste2[0].hasOwnProperty('home_pen')) {
+                    el.innerText = '✅ Todas as colunas já existem!';
+                } else {
+                    const sql2 = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_pen INTEGER, ADD COLUMN IF NOT EXISTS away_pen INTEGER;`;
+                    try {
+                        const sess2 = await banco.auth.getSession();
+                        const token2 = sess2.data.session?.access_token;
+                        if (token2) {
+                            await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token2}` },
+                                body: JSON.stringify({ query: sql2 })
+                            });
+                        }
+                    } catch (e) {}
+                }
+            } catch (e) {}
+            try {
+                const { data: teste3 } = await banco.from('jogos').select('manual_edit').limit(1);
+                if (teste3 && teste3[0] && teste3[0].hasOwnProperty('manual_edit')) {
+                    el.innerText = '✅ Todas as colunas já existem!';
                     return;
                 }
             } catch (e) {}
-            const sql = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_scorers TEXT, ADD COLUMN IF NOT EXISTS away_scorers TEXT;`;
+            const sql = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
             try {
                 const sess = await banco.auth.getSession();
                 const token = sess.data.session?.access_token;
@@ -2008,7 +2070,9 @@
                     const palpite = palpitesDoUsuario.find(p => p.jogo_id === jogo.id);
                     if (!palpite) return;
                     const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                    const r1 = jogo.res1, r2 = jogo.res2;
+                    const res = getRes(jogo);
+                    const r1 = res.r1, r2 = res.r2;
+                    if (r1 === null || r2 === null) return;
                     if (p1 === r1 && p2 === r2) pontos += 5;
                     else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontos += 3;
                 });
@@ -2098,7 +2162,11 @@
         }
 
         function renderizarJogoAdmin(jogo) {
-            const container = document.getElementById('lista-jogos-admin');
+            const isMataMata = ehMataMata(jogo.grupo);
+            const penInputs = isMataMata ? `
+                        <input type="number" id="adm_hp_${jogo.id}" value="${jogo.home_pen != null ? jogo.home_pen : ''}" placeholder="P" style="width:28px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.7rem;" title="Pênaltis time1">
+                        <span style="font-size:0.7rem;">x</span>
+                        <input type="number" id="adm_ap_${jogo.id}" value="${jogo.away_pen != null ? jogo.away_pen : ''}" placeholder="P" style="width:28px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.7rem;" title="Pênaltis time2">` : '';
             container.innerHTML += `
                 <div style="margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid #eee;">
                     <div style="font-size:0.75rem;color:#888;margin-bottom:2px;">${rotuloJogo(jogo)} • ID ${jogo.id}</div>
@@ -2109,6 +2177,7 @@
                         <input type="number" id="adm_r1_${jogo.id}" value="${jogo.res1 !== null ? jogo.res1 : ''}" style="width:35px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
                         <span style="font-size:0.8rem;">x</span>
                         <input type="number" id="adm_r2_${jogo.id}" value="${jogo.res2 !== null ? jogo.res2 : ''}" style="width:35px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+                        ${penInputs}
                         <button onclick="salvarResultadoAdmin(${jogo.id})" style="padding:4px 6px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;">💾</button>
                         <button onclick="excluirJogoAdmin(${jogo.id})" style="padding:4px 6px;background:#d93025;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;">🗑️</button>
                     </div>
@@ -2121,12 +2190,18 @@
             const t2 = document.getElementById('adm_t2_'+id).value.trim();
             const r1 = document.getElementById('adm_r1_'+id).value;
             const r2 = document.getElementById('adm_r2_'+id).value;
+            const hpEl = document.getElementById('adm_hp_'+id);
+            const apEl = document.getElementById('adm_ap_'+id);
+            const hp = hpEl && hpEl.value !== '' ? parseInt(hpEl.value) : null;
+            const ap = apEl && apEl.value !== '' ? parseInt(apEl.value) : null;
 
             const sess = await banco.auth.getSession();
             const token = sess.data.session?.access_token;
             if (!token) return alert("Sessão expirada. Refaça o login.");
 
-            const updateData = { time1: t1, time2: t2, res1: r1 !== '' ? parseInt(r1) : null, res2: r2 !== '' ? parseInt(r2) : null };
+            const updateData = { time1: t1, time2: t2, res1: r1 !== '' ? parseInt(r1) : null, res2: r2 !== '' ? parseInt(r2) : null, manual_edit: true };
+            if (hp !== null) updateData.home_pen = hp; else updateData.home_pen = null;
+            if (ap !== null) updateData.away_pen = ap; else updateData.away_pen = null;
             const resp = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
@@ -2251,19 +2326,23 @@
                         return true;
                     });
                     if (!jogoBD) { ignorados++; continue; }
+                    if (jogoBD.manual_edit) { continue; }
 
                     if (match.finished === 'TRUE') jogosFinalizados.add(jogoBD.id);
 
                     const res1 = jogoBD.time1 === timeCasa ? gc : gf;
                     const res2 = jogoBD.time1 === timeCasa ? gf : gc;
+                    const hp = match.home_penalty_score != null ? parseInt(match.home_penalty_score) : null;
+                    const ap = match.away_penalty_score != null ? parseInt(match.away_penalty_score) : null;
 
-                    if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2) {
+                    if (jogoBD.res1 !== res1 || jogoBD.res2 !== res2 || jogoBD.home_pen !== hp || jogoBD.away_pen !== ap) {
                         const updateData = { res1, res2 };
                         try {
                             const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
                             const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
                             if (hs || as) { updateData.home_scorers = hs; updateData.away_scorers = as; }
                         } catch (e) {}
+                        if (!isNaN(hp) && !isNaN(ap)) { updateData.home_pen = hp; updateData.away_pen = ap; }
                         try {
                             await banco.from('jogos').update(updateData).eq('id', jogoBD.id);
                         } catch (e) {
@@ -2277,10 +2356,10 @@
                             const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
                             const hsBD = jogoBD.home_scorers ? JSON.stringify(parseScorers(jogoBD.home_scorers)) : null;
                             const asBD = jogoBD.away_scorers ? JSON.stringify(parseScorers(jogoBD.away_scorers)) : null;
-                            if ((hs || null) !== hsBD || (as || null) !== asBD) {
-                                try {
-                                    await banco.from('jogos').update({ home_scorers: hs, away_scorers: as }).eq('id', jogoBD.id);
-                                } catch (e) {}
+                            if ((hs || null) !== hsBD || (as || null) !== asBD || jogoBD.home_pen !== hp || jogoBD.away_pen !== ap) {
+                                const upd = { home_scorers: hs, away_scorers: as };
+                                if (!isNaN(hp) && !isNaN(ap)) { upd.home_pen = hp; upd.away_pen = ap; }
+                                try { await banco.from('jogos').update(upd).eq('id', jogoBD.id); } catch (e) {}
                             }
                         } catch (e) {}
                     }
@@ -2291,7 +2370,7 @@
                     for (const j of todosApos) {
                         if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
                             try {
-                                await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null }).eq('id', j.id);
+                            await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null, home_pen: null, away_pen: null }).eq('id', j.id);
                             } catch (e) {
                                 await banco.from('jogos').update({ res1: null, res2: null }).eq('id', j.id);
                             }
@@ -2339,7 +2418,7 @@
             const container = document.getElementById('lista-dias-popup');
             container.innerHTML = 'Carregando...';
             document.getElementById('popup-dias').style.display = 'flex';
-            const todosDias = [...new Set(jogos.filter(j => j.grupo?.startsWith('Grupo')).map(j => j.data.split(' - ')[0]))];
+            const todosDias = [...new Set(jogos.map(j => j.data.split(' - ')[0]))];
             todosDias.sort((a, b) => {
                 const [dA, mA] = a.split('/').map(Number);
                 const [dB, mB] = b.split('/').map(Number);
@@ -2349,6 +2428,7 @@
             try {
                 const { data } = await banco.from('configuracoes').select('valor').eq('chave', 'dias_visiveis').maybeSingle();
                 if (data?.valor) visiveis = JSON.parse(data.valor);
+                else { const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null'); if (local) visiveis = local; }
             } catch (e) {
                 const local = JSON.parse(localStorage.getItem('diasVisiveis') || 'null');
                 if (local) visiveis = local;
@@ -2371,7 +2451,7 @@
             const checks = document.querySelectorAll('.dia-check');
             const selecionados = [];
             checks.forEach(c => { if (c.checked) selecionados.push(c.value); });
-            const valor = selecionados.length === 0 || selecionados.length === checks.length ? null : JSON.stringify(selecionados);
+            const valor = selecionados.length === 0 ? null : JSON.stringify(selecionados);
             try {
                 await banco.from('configuracoes').upsert(
                     { chave: 'dias_visiveis', valor },
@@ -2408,10 +2488,16 @@
                     const partes = match.local_date.split(' ');
                     const dataApi = `${partes[0].split('/').slice(0,2).reverse().join('/')} - ${partes[1] || '00:00'}`;
                     const dataFormatada = getDataBrasilia(timeCasa, timeFora, dataApi, match);
-                    const { error } = await banco.from('jogos').insert({
-                        id: novoId++, grupo: '16 Avos', data: dataFormatada,
-                        time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null
-                    });
+                    const insertData = { id: novoId++, grupo: '16 Avos', data: dataFormatada, time1: timeCasa || 'A definir', time2: timeFora || 'A definir', res1: null, res2: null };
+                    try {
+                        const hp = match.home_penalty_score != null ? parseInt(match.home_penalty_score) : null;
+                        const ap = match.away_penalty_score != null ? parseInt(match.away_penalty_score) : null;
+                        if (!isNaN(hp) && !isNaN(ap)) { insertData.home_pen = hp; insertData.away_pen = ap; }
+                        const hs = match.home_scorers && match.home_scorers !== 'null' ? JSON.stringify(parseScorers(match.home_scorers)) : null;
+                        const as = match.away_scorers && match.away_scorers !== 'null' ? JSON.stringify(parseScorers(match.away_scorers)) : null;
+                        if (hs || as) { insertData.home_scorers = hs; insertData.away_scorers = as; }
+                    } catch (e) {}
+                    const { error } = await banco.from('jogos').insert(insertData);
                     if (!error) inseridos++;
                 }
 
@@ -2441,7 +2527,8 @@
                 palpitesComJogo.forEach(p => {
                     const jogo = jogos.find(j => j.id === p.jogo_id);
                     if (!jogo) return;
-                    const r1 = jogo.res1, r2 = jogo.res2;
+                    const res = getRes(jogo);
+                    const r1 = res.r1, r2 = res.r2;
                     const temResultado = r1 !== null && r2 !== null;
                     let acerto = 0;
                     if (temResultado) {
@@ -2450,7 +2537,7 @@
                         pontos += acerto;
                     }
                     const corLinha = temResultado ? '' : 'style="background:#fffde7;padding:4px 2px;border-radius:4px;"';
-                    const resultadoStr = temResultado ? `${jogo.res1}x${jogo.res2}` : '?x?';
+                    const resultadoStr = temResultado ? `${r1}x${r2}` : '?x?';
                     const ptsStr = temResultado ? `<span style="color:${acerto === 5 ? 'green' : acerto === 3 ? '#666' : 'red'};">(+${acerto})</span>` : '<span style="color:#aaa;">(⏳ futuro)</span>';
                     detalhes += `<div style="font-size:0.75rem;padding:2px 0;border-bottom:1px solid #f0f0f0;" ${corLinha}>
                         ${jogo.time1} ${resultadoStr} ${jogo.time2}
@@ -2488,9 +2575,11 @@
                 if (jogo.res1 === null || jogo.res2 === null) return;
                 const palpite = palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id);
                 if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
+                const res = getRes(jogo);
+                const r1 = res.r1, r2 = res.r2;
+                if (r1 === null || r2 === null) return;
                 totalJogos++;
                 const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                const r1 = jogo.res1, r2 = jogo.res2;
                 if (p1 === r1 && p2 === r2) { totalCravadas++; totalPontos += 5; }
                 else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) { totalAcertos++; totalPontos += 3; }
                 else { totalErros++; }
@@ -2549,7 +2638,9 @@
                     const palpite = palpitesSalvosFiltro.find(p => p.jogo_id === jogo.id);
                     if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
                     const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                    const r1 = jogo.res1, r2 = jogo.res2;
+                    const res = getRes(jogo);
+                    const r1 = res.r1, r2 = res.r2;
+                    if (r1 === null || r2 === null) return;
                     if (p1 === r1 && p2 === r2) pontosDia += 5;
                     else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) pontosDia += 3;
                 });
@@ -2687,7 +2778,9 @@
                 if (!palpite || palpite.palpite_time1 === '' || palpite.palpite_time2 === '') return;
 
                 const p1 = palpite.palpite_time1, p2 = palpite.palpite_time2;
-                const r1 = jogo.res1, r2 = jogo.res2;
+                const res = getRes(jogo);
+                const r1 = res.r1, r2 = res.r2;
+                if (r1 === null || r2 === null) return;
                 let categoria = 'errou';
                 if (p1 === r1 && p2 === r2) categoria = 'cravada';
                 else if ((p1 > p2 && r1 > r2) || (p1 < p2 && r1 < r2) || (p1 === p2 && r1 === r2)) categoria = 'acertou';
@@ -2819,7 +2912,7 @@
             <details style="margin-bottom:10px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;text-align:left;font-size:0.8rem;">
                 <summary style="cursor:pointer;color:#888;font-weight:bold;">⚽ Artilheiros</summary>
                 <div style="margin-top:8px;">
-                <button onclick="adicionarColunasArtilheiros()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">➕ Adicionar colunas de artilheiros</button>
+                <button onclick="adicionarColunasArtilheiros()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">➕ Adicionar colunas de artilheiros e pênaltis</button>
                 <div id="status-artilheiros" style="font-size:0.75rem;color:#888;margin-top:6px;text-align:center;"></div>
                 </div>
             </details>
