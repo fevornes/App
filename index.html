@@ -1307,15 +1307,10 @@
                     btn.onclick = () => alternarAbaGrupo(grupo);
                     gruposContainer.appendChild(btn);
                 });
-                // Ativar aba: 16 Avos a partir de 28/06, senão primeiro dia
-                if (hoje >= new Date(2026, 5, 28)) {
-                    const tab16 = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === '16 Avos');
-                    if (tab16) tab16.click();
-                    else { const p = document.querySelector('#dias-tabs .tab-btn'); if (p) p.click(); }
-                } else {
-                    const p = document.querySelector('#dias-tabs .tab-btn');
-                    if (p) p.click();
-                }
+                // Ativar aba: Semifinais por padrão
+                const tabSF = [...document.querySelectorAll('#dias-tabs .tab-btn')].find(b => b.innerText === 'Semifinais');
+                if (tabSF) tabSF.click();
+                else { const p = document.querySelector('#dias-tabs .tab-btn'); if (p) p.click(); }
 
                 jogos.forEach(jogo => {
                     if (!jogo.grupo.startsWith('Grupo')) return;
