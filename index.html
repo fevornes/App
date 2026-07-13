@@ -1247,7 +1247,8 @@
                                 else if (encerrado) labelFase = '<div style="font-size:0.75rem;color:#999;text-align:center;margin-top:5px;">🔒 Palpite encerrado</div>';
                                 const btnLimparFase = !encerrado && temPalpiteFase
                                     ? `<button class="btn-limpar" onclick="limparPalpite(${j.id})" title="Limpar palpite">✕ Limpar</button>` : '';
-                                html += `<div class="jogo-card ${classeCard}" style="display:flex;flex-direction:column;padding:10px;margin:6px 0;border-radius:8px;">`;
+                                html += `<div class="jogo-card ${classeCard}" style="display:flex;flex-direction:column;padding:10px;margin:6px 0;border-radius:8px;position:relative;">`;
+                                if (usuarioAtual && usuarioAtual.email === 'vornesfelipe@gmail.com') html += `<span onclick="abrirAdminParaJogo(${j.id})" style="position:absolute;top:4px;right:6px;cursor:pointer;font-size:0.8rem;color:#aaa;" title="Editar resultado">✏️</span>`;
                                 html += `<div style="font-size:0.75rem;color:#888;text-align:center;">${infoLinha}</div>`;
                                 html += `<div class="placar-container"><div class="time mandante">${j.time1}</div>`;
                                 html += `<input type="number" id="jogo_${j.id}_p1" min="0" value="${p1Value}" ${disabledAttr}>`;
@@ -1361,7 +1362,8 @@
                         : '';
 
                     const card = `
-                        <div class="jogo-card jogo-dia ${classeResultado} ${liveClass}" data-dia="${diaDoJogo}" data-grupo="${jogo.grupo}">
+                        <div class="jogo-card jogo-dia ${classeResultado} ${liveClass}" data-dia="${diaDoJogo}" data-grupo="${jogo.grupo}" style="position:relative;">
+                            ${usuarioAtual && usuarioAtual.email === 'vornesfelipe@gmail.com' ? `<span onclick="abrirAdminParaJogo(${jogo.id})" style="position:absolute;top:4px;right:6px;cursor:pointer;font-size:0.8rem;color:#aaa;" title="Editar resultado">✏️</span>` : ''}
                             <div class="info-jogo">${statusJogo}</div>
                             <div class="placar-container">
                                 <div class="time mandante">${jogo.time1}</div>
@@ -2066,6 +2068,17 @@ ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
 
             document.getElementById('popup-admin').style.display = 'flex';
             renderizarListaJogosAdmin();
+        }
+
+        function abrirAdminParaJogo(jogoId) {
+            if (usuarioAtual.email !== 'vornesfelipe@gmail.com') return;
+            document.getElementById('popup-admin').style.display = 'flex';
+            document.getElementById('filtro-dia-admin').value = 'todos';
+            renderizarListaJogosAdmin();
+            setTimeout(() => {
+                const el = document.getElementById('adm_r1_' + jogoId);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
         }
 
         function renderizarListaJogosAdmin() {
