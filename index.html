@@ -2110,11 +2110,6 @@ ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
 
         function renderizarJogoAdmin(jogo) {
             const container = document.getElementById('lista-jogos-admin');
-            const isMataMata = ehMataMata(jogo.grupo);
-            const penInputs = isMataMata ? `
-                        <input type="number" id="adm_hp_${jogo.id}" value="${jogo.home_pen != null ? jogo.home_pen : ''}" placeholder="P" style="width:28px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.7rem;" title="Pênaltis time1">
-                        <span style="font-size:0.7rem;">x</span>
-                        <input type="number" id="adm_ap_${jogo.id}" value="${jogo.away_pen != null ? jogo.away_pen : ''}" placeholder="P" style="width:28px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.7rem;" title="Pênaltis time2">` : '';
             container.innerHTML += `
                 <div style="margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid #eee;">
                     <div style="font-size:0.75rem;color:#888;margin-bottom:2px;">${rotuloJogo(jogo)} • ID ${jogo.id}</div>
@@ -2125,7 +2120,6 @@ ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
                         <input type="number" id="adm_r1_${jogo.id}" value="${jogo.res1 !== null ? jogo.res1 : ''}" style="width:35px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
                         <span style="font-size:0.8rem;">x</span>
                         <input type="number" id="adm_r2_${jogo.id}" value="${jogo.res2 !== null ? jogo.res2 : ''}" style="width:35px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
-                        ${penInputs}
                         <button onclick="salvarResultadoAdmin(${jogo.id})" style="padding:4px 6px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;">💾</button>
                         <button onclick="excluirJogoAdmin(${jogo.id})" style="padding:4px 6px;background:#d93025;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem;">🗑️</button>
                     </div>
@@ -2138,18 +2132,12 @@ ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
             const t2 = document.getElementById('adm_t2_'+id).value.trim();
             const r1 = document.getElementById('adm_r1_'+id).value;
             const r2 = document.getElementById('adm_r2_'+id).value;
-            const hpEl = document.getElementById('adm_hp_'+id);
-            const apEl = document.getElementById('adm_ap_'+id);
-            const hp = hpEl && hpEl.value !== '' ? parseInt(hpEl.value) : null;
-            const ap = apEl && apEl.value !== '' ? parseInt(apEl.value) : null;
 
             const sess = await banco.auth.getSession();
             const token = sess.data.session?.access_token;
             if (!token) return alert("Sessão expirada. Refaça o login.");
 
             const updateData = { time1: t1, time2: t2, res1: r1 !== '' ? parseInt(r1) : null, res2: r2 !== '' ? parseInt(r2) : null, manual_edit: true };
-            if (hp !== null) updateData.home_pen = hp; else updateData.home_pen = null;
-            if (ap !== null) updateData.away_pen = ap; else updateData.away_pen = null;
             const resp = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
