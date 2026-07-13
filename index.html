@@ -265,7 +265,8 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
             <span id="usuario-saudacao" style="font-weight: bold; font-size: 1.1rem;"></span>
             <div style="display: flex; gap: 6px;">
-                <button style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text);padding:0;" onclick="sincronizarAuto()" title="Atualizar resultados">🔄</button>
+                <!-- Sincronização manual desativada -->
+                <!-- <button style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text);padding:0;" onclick="sincronizarAuto()" title="Atualizar resultados">🔄</button> -->
                 <button style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text);padding:0;" onclick="abrirPopupFiltros()" title="Meus Resultados">🎯</button>
                 <button class="btn-header-menu" onclick="abrirMenu()">☰</button>
             </div>
@@ -762,10 +763,10 @@
                 })
                 .subscribe();
 
-            // Sincronizar resultados automaticamente a cada 30 segundos
-            if (intervaloAuto) clearInterval(intervaloAuto);
-            sincronizarAuto();
-            intervaloAuto = setInterval(sincronizarAuto, 30000);
+            // Sincronização automática desativada - resultados são editados manualmente pelo admin
+            // if (intervaloAuto) clearInterval(intervaloAuto);
+            // sincronizarAuto();
+            // intervaloAuto = setInterval(sincronizarAuto, 30000);
 
             // Real-time: quando alguém alterar resultados no banco, atualiza na tela
             banco.channel('jogos-rt')
