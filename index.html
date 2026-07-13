@@ -784,7 +784,7 @@
                 const data = await resp.json();
                 const matches = data.games || [];
                 console.log('[AutoSync] Partidas recebidas da API:', matches.length);
-                const { data: todosJogos } = await banco.from('jogos').select('*');
+                let { data: todosJogos } = await banco.from('jogos').select('*');
                 if (!todosJogos) { console.warn('[AutoSync] Nenhum jogo no banco'); return; }
 
                 await importarMataMataAPI();
@@ -1990,66 +1990,12 @@
         async function adicionarColunasArtilheiros() {
             const el = document.getElementById('status-artilheiros');
             if (!el) return;
-            el.innerText = '🔄 Verificando...';
-            try {
-                const { data: teste } = await banco.from('jogos').select('home_scorers').limit(1);
-                if (teste && teste[0] && teste[0].hasOwnProperty('home_scorers')) {
-                    el.innerText = '✅ Colunas de artilheiros já existem!';
-                } else {
-                    const sql = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_scorers TEXT, ADD COLUMN IF NOT EXISTS away_scorers TEXT;`;
-                    try {
-                        const sess = await banco.auth.getSession();
-                        const token = sess.data.session?.access_token;
-                        if (token) {
-                            const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
-                                body: JSON.stringify({ query: sql })
-                            });
-                        }
-                    } catch (e) {}
-                }
-            } catch (e) {}
-            try {
-                const { data: teste2 } = await banco.from('jogos').select('home_pen').limit(1);
-                if (teste2 && teste2[0] && teste2[0].hasOwnProperty('home_pen')) {
-                    el.innerText = '✅ Todas as colunas já existem!';
-                } else {
-                    const sql2 = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_pen INTEGER, ADD COLUMN IF NOT EXISTS away_pen INTEGER;`;
-                    try {
-                        const sess2 = await banco.auth.getSession();
-                        const token2 = sess2.data.session?.access_token;
-                        if (token2) {
-                            await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token2}` },
-                                body: JSON.stringify({ query: sql2 })
-                            });
-                        }
-                    } catch (e) {}
-                }
-            } catch (e) {}
-            try {
-                const { data: teste3 } = await banco.from('jogos').select('manual_edit').limit(1);
-                if (teste3 && teste3[0] && teste3[0].hasOwnProperty('manual_edit')) {
-                    el.innerText = '✅ Todas as colunas já existem!';
-                    return;
-                }
-            } catch (e) {}
-            const sql = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
-            try {
-                const sess = await banco.auth.getSession();
-                const token = sess.data.session?.access_token;
-                if (token) {
-                    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ query: sql })
-                    });
-                    if (r.ok) { el.innerText = '✅ Colunas adicionadas!'; await carregarJogosEJogadores(); return; }
-                }
-            } catch (e) {}
-            el.innerHTML = `❌ Não foi possível adicionar automaticamente.<br><br>Copie e execute no <a href="https://supabase.com/dashboard/project/ixnqcwilmvgzkxfmkfaq/sql/new" target="_blank">SQL Editor do Supabase</a>:<br><br><code style="font-size:0.75rem;background:#eee;padding:4px;border-radius:4px;display:block;word-break:break-all;">${sql}</code>`;
+            const sql = `ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_scorers TEXT;
+ALTER TABLE jogos ADD COLUMN IF NOT EXISTS away_scorers TEXT;
+ALTER TABLE jogos ADD COLUMN IF NOT EXISTS home_pen INTEGER;
+ALTER TABLE jogos ADD COLUMN IF NOT EXISTS away_pen INTEGER;
+ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
+            el.innerHTML = `<button onclick="navigator.clipboard.writeText(document.getElementById('sql-code').textContent).then(()=>this.innerText='✅ Copiado!')" style="width:100%;padding:6px;background:var(--primary);color:white;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;margin-bottom:6px;">📋 Copiar SQL</button><br>Depois abra o <a href="https://supabase.com/dashboard/project/ixnqcwilmvgzkxfmkfaq/sql/new" target="_blank" style="color:var(--primary);font-weight:bold;">SQL Editor do Supabase</a>, cole e clique em Run.<br><br><code id="sql-code" style="font-size:0.7rem;background:#eee;padding:6px;border-radius:4px;display:block;word-break:break-all;white-space:pre-wrap;">${sql}</code>`;
         }
 
         async function abrirEdicaoPontos() {
@@ -2162,6 +2108,7 @@
         }
 
         function renderizarJogoAdmin(jogo) {
+            const container = document.getElementById('lista-jogos-admin');
             const isMataMata = ehMataMata(jogo.grupo);
             const penInputs = isMataMata ? `
                         <input type="number" id="adm_hp_${jogo.id}" value="${jogo.home_pen != null ? jogo.home_pen : ''}" placeholder="P" style="width:28px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:0.7rem;" title="Pênaltis time1">
