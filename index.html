@@ -2158,6 +2158,37 @@ ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
             await carregarJogosEJogadores();
         }
 
+        async function salvarTodosResultados() {
+            const el = document.getElementById('status-salvar-todos');
+            el.innerText = '🔄 Salvando...';
+            const sess = await banco.auth.getSession();
+            const token = sess.data.session?.access_token;
+            if (!token) { el.innerText = '❌ Sessão expirada.'; return; }
+
+            const inputs = document.querySelectorAll('[id^="adm_r1_"]');
+            let salvos = 0, erros = 0;
+            for (const input of inputs) {
+                const id = input.id.replace('adm_r1_', '');
+                const t1 = document.getElementById('adm_t1_' + id)?.value.trim();
+                const t2 = document.getElementById('adm_t2_' + id)?.value.trim();
+                const r1 = document.getElementById('adm_r1_' + id)?.value;
+                const r2 = document.getElementById('adm_r2_' + id)?.value;
+                if (!t1 || !t2) continue;
+
+                const updateData = { time1: t1, time2: t2, res1: r1 !== '' ? parseInt(r1) : null, res2: r2 !== '' ? parseInt(r2) : null, manual_edit: true, home_pen: null, away_pen: null, home_scorers: null, away_scorers: null };
+                try {
+                    const resp = await fetch(`${SUPABASE_URL}/rest/v1/jogos?id=eq.${id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(updateData)
+                    });
+                    if (resp.ok) salvos++; else erros++;
+                } catch (e) { erros++; }
+            }
+            el.innerText = erros === 0 ? `✅ ${salvos} jogos salvos!` : `⚠️ ${salvos} salvos, ${erros} erros.`;
+            if (salvos > 0) await carregarJogosEJogadores();
+        }
+
         async function adicionarJogoAdmin() {
             const grupo = document.getElementById('adm-novo-grupo').value;
             const data = document.getElementById('adm-novo-data').value.trim();
@@ -2928,6 +2959,8 @@ ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
             <div style="font-size:0.8rem;color:#666;margin-bottom:6px;text-align:left;">Editar resultados:</div>
             <select id="filtro-dia-admin" onchange="renderizarListaJogosAdmin()" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;margin-bottom:8px;"></select>
             <div id="lista-jogos-admin" style="text-align: left; max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
+            <button onclick="salvarTodosResultados()" style="width:100%;padding:8px;margin-top:8px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">💾 Salvar Todos os Resultados</button>
+            <div id="status-salvar-todos" style="font-size:0.75rem;color:#888;margin-top:4px;text-align:center;"></div>
             <button class="btn-acao" style="margin-top: 15px; background: #666;" onclick="fecharAdmin()">Fechar</button>
         </div>
     </div>
