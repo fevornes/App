@@ -1121,9 +1121,9 @@
                 
                 jogos = jogosDoBanco;
 
-                // Limpar resultados de jogos que ainda não começaram
+                // Limpar resultados de jogos que ainda não começaram (ignorar se editado manualmente)
                 for (const j of jogos) {
-                    if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
+                    if (!jogoJaComecou(j.data) && !j.manual_edit && (j.res1 !== null || j.res2 !== null)) {
                         try {
                                 await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null, home_pen: null, away_pen: null }).eq('id', j.id);
                         } catch (e) {
@@ -2336,7 +2336,7 @@ ALTER TABLE jogos ADD COLUMN IF NOT EXISTS manual_edit BOOLEAN DEFAULT FALSE;`;
                 const { data: todosApos } = await banco.from('jogos').select('*');
                 if (todosApos) {
                     for (const j of todosApos) {
-                        if (!jogoJaComecou(j.data) && (j.res1 !== null || j.res2 !== null)) {
+                        if (!jogoJaComecou(j.data) && !j.manual_edit && (j.res1 !== null || j.res2 !== null)) {
                             try {
                             await banco.from('jogos').update({ res1: null, res2: null, home_scorers: null, away_scorers: null, home_pen: null, away_pen: null }).eq('id', j.id);
                             } catch (e) {
